@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  user_id   String
+  label     String
+  address   String?
+  createdAt DateTime @default(now())
+
+  incomes       Income[]
+  expenses      Expense[]
+  amortizations Amortization[]
+}
+
+model Income {
+  id         String   @id @default(uuid())
+  user_id    String
+  propertyId String
+  date       DateTime
+  amount     Decimal  @db.Decimal(12, 2)
+  label      String?
+  Property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([user_id])
+  @@index([propertyId])
+}
+
+model Expense {
+  id         String   @id @default(uuid())
+  user_id    String
+  propertyId String
+  date       DateTime
+  amount     Decimal  @db.Decimal(12, 2)
+  category   String
+  label      String?
+  Property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([user_id])
+  @@index([propertyId])
+}
+
+model Amortization {
+  id         String   @id @default(uuid())
+  user_id    String
+  propertyId String
+  year       Int
+  amount     Decimal  @db.Decimal(12, 2)
+  note       String?
+  Property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([user_id])
+  @@index([propertyId])
+}
