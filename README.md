@@ -122,5 +122,16 @@ curl -H "Authorization: Bearer <token>" \
   "http://localhost:3000/api/assets/<assetId>/amortization/export?format=csv" -o amort.csv
 ```
 
+## Rapports
+### Balance (P2-A)
+Page `/reports/balance` (accès admin) : agrégation par `account_code` à partir de `journal_entries`.
+Règles:
+- `achat` => débit
+- `vente` => crédit
+- solde = total_debit - total_credit
+Filtres: `from`, `to`, `account_code` (contient), `q` (recherche designation/tier/account_code). RLS user_id appliqué.
+Exports: `/api/reports/balance/export?format=csv|pdf`.
+Limites: pas de pagination (OK dataset limité); PDF tronqué à 5000 lignes.
+
 ---
 RLS: exécuter `supabase/policies.sql` après création des tables (si non gérées via l'interface).
