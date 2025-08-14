@@ -24,7 +24,10 @@
     "export:ventes:csv": "node scripts/export-journal.js ventes csv",
     "export:ventes:xlsx": "node scripts/export-journal.js ventes xlsx",
     "test": "vitest run",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@mantine/core": "^8.2.4",
@@ -36,16 +39,18 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.55.0",
     "dotenv": "^17.2.1",
+    "esbuild": "^0.25.9",
     "next": "15.4.6",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.12.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.8",
-    "pdf-lib": "^1.17.1"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.46.0",
     "@tailwindcss/cli": "^4.1.11",
     "@types/node": "^20",
     "@types/react": "^19",
