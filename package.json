@@ -3,15 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "concurrently \"next dev --turbopack\" \"pnpm:css:dev\"",
-  "build": "pnpm css:build && next build",
-  "start": "next start",
-  "css:dev": "pnpm dlx tailwindcss -i ./src/app/globals.css -o ./public/tailwind.css --watch",
-  "css:build": "pnpm dlx tailwindcss -i ./src/app/globals.css -o ./public/tailwind.css --minify",
-  "db:generate": "prisma generate",
-  "db:migrate": "prisma migrate dev",
-  "db:studio": "prisma studio",
-  "lint": "next lint"
+    "dev": "concurrently \"next dev --turbopack\" \"pnpm:css:dev\"",
+    "build": "pnpm db:generate && pnpm css:build && next build",
+    "start": "next start",
+    "css:dev": "pnpm exec tailwindcss -i ./src/app/globals.css -o ./public/tailwind.css --watch",
+    "css:build": "pnpm exec tailwindcss -i ./src/app/globals.css -o ./public/tailwind.css --minify",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:format": "prisma format",
+    "db:seed:demo": "node scripts/seed-demo.js",
+    "db:test": "dotenv -e .env -- node scripts/test-db.js",
+    "db:test:pg": "dotenv -e .env -- node scripts/test-pg.js",
+    "db:diagnose": "dotenv -e .env -- node scripts/diagnose-network.js",
+    "db:check-all": "pnpm db:test || true && pnpm db:diagnose",
+    "admin:ensure": "dotenv -e .env -- node scripts/ensure-admin.js",
+    "lint": "next lint"
   },
   "dependencies": {
     "@mantine/core": "^8.2.4",
@@ -22,20 +30,27 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.55.0",
+    "dotenv": "^17.2.1",
     "next": "15.4.6",
+    "pg": "^8.12.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@tailwindcss/cli": "^4.1.11",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.0",
+    "dotenv-cli": "^7.4.2",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "prisma": "^6.14.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

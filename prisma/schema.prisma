@@ -18,6 +18,8 @@ model Property {
   incomes       Income[]
   expenses      Expense[]
   amortizations Amortization[]
+
+  @@map("Property")
 }
 
 model Income {
@@ -31,6 +33,7 @@ model Income {
 
   @@index([user_id])
   @@index([propertyId])
+  @@map("Income")
 }
 
 model Expense {
@@ -45,6 +48,7 @@ model Expense {
 
   @@index([user_id])
   @@index([propertyId])
+  @@map("Expense")
 }
 
 model Amortization {
@@ -58,4 +62,42 @@ model Amortization {
 
   @@index([user_id])
   @@index([propertyId])
+  @@map("Amortization")
+}
+
+/// ================= Added journal & assets =================
+
+enum JournalEntryType {
+  achat
+  vente
+}
+
+model JournalEntry {
+  id           String           @id @default(uuid())
+  user_id      String
+  type         JournalEntryType
+  date         DateTime
+  designation  String
+  tier         String?
+  account_code String
+  amount       Decimal          @db.Decimal(12, 2)
+  currency     String           @default("EUR")
+  created_at   DateTime         @default(now())
+
+  @@index([user_id])
+  @@map("journal_entries")
+}
+
+model Asset {
+  id              String   @id @default(uuid())
+  user_id         String
+  label           String
+  amount_ht       Decimal  @db.Decimal(12, 2)
+  duration_years  Int
+  acquisition_date DateTime
+  account_code    String
+  created_at      DateTime @default(now())
+
+  @@index([user_id])
+  @@map("assets")
 }

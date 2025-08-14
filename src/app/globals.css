@@ -1,4 +1,92 @@
+@import "tailwindcss";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* app/globals.css */
+
+/* ---- Thème clair par défaut (Tailwind v4: tokens @theme) ---- */
+@theme {
+    /* Typo & taille */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+
+    /* Rayons & ombres */
+    --radius-sm: 0.375rem;
+    --radius: 0.75rem;          /* défaut */
+    --radius-lg: 1rem;
+    --radius-2xl: 1.25rem;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .06);
+    --shadow: 0 4px 14px rgba(0, 0, 0, .08);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, .12);
+
+    /* Palette sémantique (OKLCH pour des teintes propres sur tous écrans) */
+    /* Cyan “brand” (accent) */
+    --color-brand: oklch(.74 .16 208);            /* ~ cyan-600 */
+    --color-brand-foreground: oklch(.22 .03 220); /* texte sur bouton brand */
+    --color-ring: oklch(.78 .15 208);
+
+    /* Neutres & surfaces */
+    --color-bg: oklch(.98 .01 255);        /* fond page très clair */
+    --color-bg-muted: oklch(.96 .01 255);  /* sections, cards soft */
+    --color-card: oklch(.99 .005 255);
+    --color-foreground: oklch(.26 .02 253);/* texte par défaut */
+    --color-muted-foreground: oklch(.47 .02 255);
+
+    /* Bordures & séparateurs */
+    --color-border: oklch(.88 .01 255);
+
+    /* États */
+    --color-success: oklch(.75 .18 155);
+    --color-warning: oklch(.84 .17 86);
+    --color-danger: oklch(.62 .23 25);
+}
+
+/* ---- Variante sombre (optionnelle, activée par .dark sur <html>) ---- */
+@theme .dark {
+    --color-bg: oklch(.19 .02 260);
+    --color-bg-muted: oklch(.24 .02 260);
+    --color-card: oklch(.22 .02 260);
+    --color-foreground: oklch(.95 .01 260);
+    --color-muted-foreground: oklch(.80 .02 260);
+    --color-border: oklch(.38 .02 260);
+    --color-ring: oklch(.82 .12 208);
+}
+
+/* ---- Base globale ---- */
+@layer base {
+    html, body {
+        height: 100%;
+    }
+
+    body {
+        @apply bg-bg text-foreground antialiased;
+    }
+}
+
+/* ---- Utilitaires de design “prêts à l’emploi” ---- */
+@utility card {
+    @apply bg-card rounded-[--radius-lg] shadow p-6 border border-border;
+}
+@utility btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[--radius]
+    px-4 py-2 text-[.95rem] font-medium shadow-sm border border-transparent
+    transition-colors outline-none focus-visible:ring-2 ring-[--color-ring];
+}
+@utility btn-primary {
+    @apply btn bg-brand text-[--color-brand-foreground] hover:bg-[color-mix(in_oklch,var(--color-brand)_92%,black)]
+    active:translate-y-[1px];
+}
+@utility btn-ghost {
+    @apply btn bg-transparent text-foreground border-border hover:bg-bg-muted;
+}
+@utility input {
+    @apply w-full rounded-[--radius] border border-border bg-bg
+    px-3 py-2 outline-none focus-visible:ring-2 ring-[--color-ring];
+}
