@@ -43,6 +43,9 @@ export function NavBar() {
         <div className="flex items-center gap-1 ml-2">
           <Link href="/" className={linkClass('/')}>Accueil</Link>
           {user && <Link href="/dashboard" className={linkClass('/dashboard')}>Dashboard</Link>}
+          {user && <Link href="/journal/achats" className={linkClass('/journal/achats')}>Journal Achats</Link>}
+          {user && <Link href="/journal/ventes" className={linkClass('/journal/ventes')}>Journal Ventes</Link>}
+          {user && <Link href="/assets" className={linkClass('/assets')}>Immobilisations</Link>}
           {user && role === 'admin' && <Link href="/admin" className={linkClass('/admin')}>Admin</Link>}
         </div>
       </div>

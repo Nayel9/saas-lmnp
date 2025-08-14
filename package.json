@@ -19,6 +19,11 @@
     "db:diagnose": "dotenv -e .env -- node scripts/diagnose-network.js",
     "db:check-all": "pnpm db:test || true && pnpm db:diagnose",
     "admin:ensure": "dotenv -e .env -- node scripts/ensure-admin.js",
+    "export:achats:csv": "node scripts/export-journal.js achats csv",
+    "export:achats:xlsx": "node scripts/export-journal.js achats xlsx",
+    "export:ventes:csv": "node scripts/export-journal.js ventes csv",
+    "export:ventes:xlsx": "node scripts/export-journal.js ventes xlsx",
+    "test": "vitest run",
     "lint": "next lint"
   },
   "dependencies": {
@@ -34,7 +39,10 @@
     "next": "15.4.6",
     "pg": "^8.12.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -48,7 +56,8 @@
     "eslint-config-next": "15.4.6",
     "prisma": "^6.14.0",
     "tailwindcss": "^4.1.11",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=20"

@@ -1,0 +1,9 @@
+# Normalisation des fins de ligne
+* text=auto eol=lf
+
+# Traiter explicitement certains formats binaires
+*.png binary
+*.jpg binary
+*.svg text
+*.pdf binary
+
