@@ -1,29 +1,38 @@
+import {type CookieOptions, createServerClient} from "@supabase/ssr";
+import {cookies} from "next/headers";
+import {env} from "@/lib/env";
 
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookies } from "next/headers";
+// Configuration centralisée des options cookies (session Supabase)
+const baseCookieOptions: CookieOptions = {
+  path: "/",
+  sameSite: "lax",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  maxAge: 60 * 60 * 24 * 30, // 30 jours (aligné sur Supabase par défaut)
+};
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+interface MutableCookieStore {
+  set?: (name: string, value: string, options?: CookieOptions) => void;
+  getAll: () => { name: string; value: string }[];
+}
 
-export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
-    return createServerClient(
-        supabaseUrl!,
-        supabaseKey!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll()
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-                    } catch {
-                        // The `setAll` method was called from a Server Component.
-                        // This can be ignored if you have middleware refreshing
-                        // user sessions.
-                    }
-                },
+/**
+ * Client Supabase côté serveur (Server Components, Server Actions, Route Handlers).
+ * N'expose que la clé anonyme (jamais la service_role ici).
+ */
+export async function createSupabaseServerClient() {
+    const store = (await cookies()) as unknown as MutableCookieStore; // await pour API dynamique Next 15
+    return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+        cookies: {
+            getAll() {
+                const all = store.getAll();
+                return all.map(({name, value}) => ({name, value}));
+            },
+            setAll(cookiesToSet) {
+                cookiesToSet.forEach(({name, value, options}) => {
+                    try { store.set?.(name, value, { ...baseCookieOptions, ...options }); } catch { /* ignore */ }
+                });
             },
         },
-    );
-};
+    });
+}

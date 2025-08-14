@@ -1,14 +1,21 @@
-"use client";
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { supabase } from "@/lib/supabase/client";
+"use server";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 
-export default function LoginPage() {
-    return (
-        <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-        <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />
-    </div>
-    </main>
-);
+export async function createProperty(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+  const label = (formData.get("label") || "").toString().trim();
+  if (!label) {
+    return; // TODO: gestion d'erreur UI (toast) côté client via pattern pending
+  }
+  const address = formData.get("address")?.toString().trim() || null;
+  await prisma.property.create({
+    data: { label, address, user_id: user.id },
+  });
+  redirect("/dashboard");
 }
