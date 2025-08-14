@@ -82,6 +82,8 @@ Optionnelles:
 - Ajout barre navigation + logout.
 - Nouvelles tables `journal_entries`, `assets` + RLS associé.
 - Seed démo (`pnpm db:seed:demo`).
+- Journal Achats (P1‑A) & Journal Ventes (P1‑B) : CRUD complet, exports CSV/XLSX, validations, ownership.
+- Ajout Immobilisations (P1‑C) : CRUD + calcul amortissement linéaire + export CSV.
 
 ## Évolutions possibles
 - CRUD UI pour journal & immobilisations.
@@ -89,6 +91,36 @@ Optionnelles:
 - Exports fiscaux / FEC.
 - Tests e2e (Playwright) + tests unitaires services.
 - Mode sombre.
+
+## Journaux comptables (Achats & Ventes)
+Fonctionnalités:
+- Pages: `/journal/achats` et `/journal/ventes`
+- Pagination serveur (20 lignes), tri date desc
+- Filtres via query params: `page`, `from`, `to`, `tier`, `q`
+- CRUD (modal Ajouter / Modifier, suppression avec server action) + validations Zod client & serveur
+- Export CSV & XLSX:
+  - Route API: `/api/journal/achats/export?format=csv|xlsx` (mêmes critères de filtre applicables)
+  - Route API: `/api/journal/ventes/export?format=csv|xlsx`
+  - Scripts CLI: `pnpm export:achats:csv|xlsx`, `pnpm export:ventes:csv|xlsx` (variables d’environnement FROM, TO, TIER, SEARCH utilisables)
+
+## Immobilisations & Amortissements
+Fonctionnalités:
+- Page `/assets`: liste paginée (20), filtres query: `page`, `from`, `to`, `q`.
+- CRUD (modal ajout / modification, suppression via server action) avec validations Zod + vérif ownership.
+- Champs: label, amount_ht, duration_years, acquisition_date, account_code.
+- Page détail `/assets/[id]/amortization`: calcul linéaire avec prorata temporis 1ère année (base mois restants) + export CSV.
+- Calcul: dotation annuelle = montant / durée. 1ère année: dotation * (mois restants/12). Dernière année ajuste les arrondis pour que cumul = montant.
+- Exports: `/api/assets/:id/amortization/export?format=csv`.
+- Tests: voir `asset-amortization.test.ts` (prorata, arrondis, cumul).
+
+Scripts utiles:
+```bash
+pnpm export:achats:csv      # déjà présent (journaux)
+pnpm export:ventes:xlsx     # idem ventes
+# Amortissement (via route API) -> curl exemple
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:3000/api/assets/<assetId>/amortization/export?format=csv" -o amort.csv
+```
 
 ---
 RLS: exécuter `supabase/policies.sql` après création des tables (si non gérées via l'interface).

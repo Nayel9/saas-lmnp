@@ -1,0 +1,54 @@
+"use server";
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+
+const assetSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z.string().min(1),
+  amount_ht: z.string().refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Montant invalide'),
+  duration_years: z.string().refine(v => Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) <= 50, 'Durée invalide'),
+  acquisition_date: z.string().refine(v => !isNaN(Date.parse(v)), 'Date invalide'),
+  account_code: z.string().min(1)
+});
+
+async function getUserId() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Non authentifié');
+  return user.id;
+}
+
+export async function createAsset(formData: FormData) {
+  const parsed = assetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map(i=>i.message).join(', ') };
+  const user_id = await getUserId();
+  const { label, amount_ht, duration_years, acquisition_date, account_code } = parsed.data;
+  await prisma.asset.create({ data: { user_id, label, amount_ht: parseFloat(amount_ht), duration_years: Number(duration_years), acquisition_date: new Date(acquisition_date), account_code } });
+  revalidatePath('/assets');
+  return { ok: true };
+}
+
+export async function updateAsset(formData: FormData) {
+  const parsed = assetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success || !parsed.data.id) return { ok: false, error: 'Validation' };
+  const user_id = await getUserId();
+  const { id, label, amount_ht, duration_years, acquisition_date, account_code } = parsed.data;
+  const existing = await prisma.asset.findUnique({ where: { id } });
+  if (!existing || existing.user_id !== user_id) return { ok: false, error: 'Introuvable' };
+  await prisma.asset.update({ where: { id }, data: { label, amount_ht: parseFloat(amount_ht), duration_years: Number(duration_years), acquisition_date: new Date(acquisition_date), account_code } });
+  revalidatePath('/assets');
+  return { ok: true };
+}
+
+export async function deleteAsset(id: string) {
+  if (!id) return { ok: false, error: 'ID manquant' };
+  const user_id = await getUserId();
+  const existing = await prisma.asset.findUnique({ where: { id } });
+  if (!existing || existing.user_id !== user_id) return { ok: false, error: 'Introuvable' };
+  await prisma.asset.delete({ where: { id } });
+  revalidatePath('/assets');
+  return { ok: true };
+}
+
