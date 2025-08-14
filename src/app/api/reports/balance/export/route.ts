@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 interface RawRow { account_code: string; total_debit: unknown; total_credit: unknown; }
-function parseNum(n: unknown): number { if (typeof n === 'number') return n; if (typeof n === 'string') { const v = parseFloat(n); return isNaN(v)?0:v; } return 0; }
+function parseNum(n: unknown): number { if (typeof n === 'number') return n; if (typeof n === 'string') { const v = parseFloat(n); return isNaN(v)?0:v; } if (n && typeof n === 'object' && 'toString' in n) { const v = parseFloat((n as { toString(): string }).toString()); return isNaN(v)?0:v; } return 0; }
 
 type SQLValue = string | number | Date;
 

@@ -7,7 +7,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 interface RawRow { account_code: string; total_debit: unknown; total_credit: unknown; }
-function parseNum(n: unknown): number { if (typeof n === 'number') return n; if (typeof n === 'string') { const v = parseFloat(n); return isNaN(v)?0:v; } return 0; }
+function parseNum(n: unknown): number { if (typeof n === 'number') return n; if (typeof n === 'string') { const v = parseFloat(n); return isNaN(v)?0:v; } if (n && typeof n === 'object' && 'toString' in n) { const v = parseFloat((n as { toString(): string }).toString()); return isNaN(v)?0:v; } return 0; }
 
 async function fetchAggregated(userId: string, params: { from?: string|null; to?: string|null; account_code?: string|null; q?: string|null }): Promise<BalanceRow[]> {
   const { from, to, account_code, q } = params;
@@ -90,7 +90,7 @@ export default async function BalanceReportPage({ searchParams }: { searchParams
             <td className="py-1 pr-4 text-right tabular-nums">{r.total_debit.toFixed(2)}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.total_credit.toFixed(2)}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.balance.toFixed(2)}</td>
-            <td className="py-1 pr-2 text-right text-xs"><Link href={`/journal/achats?account_code=${encodeURIComponent(r.account_code)}`} className="underline">Grand livre</Link></td>
+            <td className="py-1 pr-2 text-right text-xs"><Link href={`/reports/ledger?account_code=${encodeURIComponent(r.account_code)}${from?`&from=${from}`:''}${to?`&to=${to}`:''}`} className="underline">Grand livre</Link></td>
           </tr>)}
           {!rows.length && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Aucun compte</td></tr>}
         </tbody>
