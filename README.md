@@ -157,6 +157,12 @@ Structure UI:
 Totaux calculés: Total Produits, Total Charges, Dotations, Résultat = Produits - Charges - Dotations.
 Extension: ajouter prefixes dans `config/config-pcg.json` (form 2033C). La page reflète automatiquement.
 
+### 2033-E (État des amortissements)
+Page: `/reports/2033e` (admin). Paramètre `year` (défaut année courante) + filtre `q` sur label.
+API JSON: `/api/reports/2033e?year=YYYY[&q=...]` -> `{ year, rows:[{asset_id,label,valeur_origine,amortissements_anterieurs,dotation_exercice,amortissements_cumules,valeur_nette}], totals, truncated }`.
+Export XLSX: `/api/reports/2033e/export?year=YYYY` (onglets `2033E`, `Meta`). Prorata temporis 1ère année (mois restants) et arrondis identiques à `computeLinearAmortization`.
+Troncation: >10k actifs (header `X-Truncated: true`).
+
 ## Intégration Continue (CI)
 Pipeline GitHub Actions (workflow `ci.yml`) : lint, typecheck, tests unitaires, build et e2e Playwright (artefacts exports dans `e2e-exports`). Variables d'environnement injectées via secrets (Supabase + DB). Pour reproduire en local :
 ```bash
