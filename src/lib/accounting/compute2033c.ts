@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { mapToRubriques, RubriqueAggregate } from './mapToRubriques';
+import type { Prisma } from '@prisma/client';
 
 export interface C2033CParams { userId: string; from?: string | null; to?: string | null; q?: string | null; account_code?: string | null; }
 export interface C2033CTotals { produits: number; charges: number; amortissements: number; resultat: number; }
@@ -7,22 +8,21 @@ export interface C2033CResult { rubriques: RubriqueAggregate[]; totals: C2033CTo
 
 const MAX_ENTRIES = 20000; // seuil de sécurité
 
-function safeParse(n: any): number { const v = typeof n === 'number' ? n : parseFloat(n); return isNaN(v) ? 0 : v; }
+function safeParse(n: unknown): number { if (typeof n === 'number') return Number.isFinite(n)?n:0; if (typeof n === 'string') { const v = parseFloat(n); return isNaN(v)?0:v; } if (n && typeof n === 'object' && 'toString' in n) { const v = parseFloat((n as { toString(): string }).toString()); return isNaN(v)?0:v; } return 0; }
 
-function buildWhere(p: C2033CParams) {
-  const where: any = { user_id: p.userId };
+type JEWhere = Prisma.JournalEntryWhereInput;
+function buildWhere(p: C2033CParams): JEWhere {
+  const where: JEWhere = { user_id: p.userId };
   if (p.from || p.to) where.date = {};
-  if (p.from) where.date.gte = new Date(p.from as string);
-  if (p.to) where.date.lte = new Date(p.to as string);
-  const ors: any[] = [];
+  if (p.from) (where.date as Prisma.DateTimeFilter).gte = new Date(p.from);
+  if (p.to) (where.date as Prisma.DateTimeFilter).lte = new Date(p.to);
+  const ors: JEWhere[] = [];
   if (p.q) {
     ors.push({ designation: { contains: p.q, mode: 'insensitive' } });
     ors.push({ tier: { contains: p.q, mode: 'insensitive' } });
     ors.push({ account_code: { contains: p.q, mode: 'insensitive' } });
   }
-  if (p.account_code) {
-    where.account_code = { contains: p.account_code, mode: 'insensitive' };
-  }
+  if (p.account_code) where.account_code = { contains: p.account_code, mode: 'insensitive' };
   if (ors.length) where.OR = ors;
   return where;
 }
