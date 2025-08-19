@@ -29,28 +29,29 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
+            node-version: 20
+            cache: 'pnpm'
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm (action)
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-          run_install: false
-
-      - name: Verify pnpm & fallback
-        shell: bash
+      - name: Debug node & npm
         run: |
-          set -e
-          echo "PATH=$PATH"
+          set -eux
+          node -v
+          npm -v
+          which node || command -v node
+          echo "Initial PATH=$PATH"
+
+      - name: Enable & prepare pnpm via Corepack (with fallback)
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.12.3 --activate || true
           if ! command -v pnpm >/dev/null 2>&1; then
-            echo "pnpm not found after action, installing via npm ..."
-            npm install -g pnpm@9
+            echo "pnpm absent après corepack, installation fallback via npm" >&2
+            npm i -g pnpm@9.12.3
           fi
           pnpm --version
+          pnpm config get store-dir || true
+          echo "PATH après install=$PATH"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

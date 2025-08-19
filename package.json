@@ -2,6 +2,7 @@
   "name": "lmnp-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.12.3",
   "scripts": {
     "dev": "concurrently \"next dev --turbopack\" \"pnpm:css:dev\"",
     "build": "pnpm db:generate && pnpm css:build && next build",
