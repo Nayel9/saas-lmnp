@@ -7,6 +7,8 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 ## Scripts principaux
 - `pnpm dev` (Turbopack + Tailwind CLI watch)
 - `pnpm build`
+- `pnpm preview` (prévisualisation prod intelligente: rebuild seulement si nécessaire)
+- `pnpm preview:fast` (démarre directement `next start` en supposant la build à jour)
 - `pnpm css:dev` / `pnpm css:build`
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:push` / `pnpm db:studio` / `pnpm db:format`
 - `pnpm db:seed:demo` (seed démo propriétés + immobilisations + écritures journal)

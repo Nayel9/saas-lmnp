@@ -27,7 +27,9 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "preview:fast": "next start",
+    "preview": "node scripts/preview.js"
   },
   "dependencies": {
     "@mantine/core": "^8.2.4",
