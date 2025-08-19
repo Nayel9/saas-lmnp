@@ -1,5 +1,7 @@
 # LMNP App (MVP)
 
+[![CI](https://github.com/Nayel9/saas-lmnp/actions/workflows/ci.yml/badge.svg)](https://github.com/Nayel9/saas-lmnp/actions/workflows/ci.yml)
+
 Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Mantine • Supabase (Auth + Postgres + RLS) • Prisma • pnpm
 
 ## Scripts principaux
@@ -132,6 +134,24 @@ Règles:
 Filtres: `from`, `to`, `account_code` (contient), `q` (recherche designation/tier/account_code). RLS user_id appliqué.
 Exports: `/api/reports/balance/export?format=csv|pdf`.
 Limites: pas de pagination (OK dataset limité); PDF tronqué à 5000 lignes.
+
+### Grand Livre (P2-B)
+Page `/reports/ledger` (admin) – affichage des écritures d'un compte avec solde courant.
+Règles: achat=Débit, vente=Crédit, solde courant cumul (débit-crédit).
+Filtres: `account_code` (obligatoire), `from`, `to`, `q` (designation|tier|account_code partiel).
+Exports: `/api/reports/ledger/export?account_code=...&format=csv|pdf` (+ from/to/q). Troncation PDF >5000 lignes (header `X-Truncated: true`).
+Intégration: depuis la Balance, lien "Grand livre" pré-remplit compte & période.
+Limites: pas de pagination (warning si volumétrie à implémenter plus tard).
+
+## Intégration Continue (CI)
+Pipeline GitHub Actions (workflow `ci.yml`) : lint, typecheck, tests unitaires, build et e2e Playwright (artefacts exports dans `e2e-exports`). Variables d'environnement injectées via secrets (Supabase + DB). Pour reproduire en local :
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test -- --run
+pnpm build
+pnpm test:e2e
+```
 
 ---
 RLS: exécuter `supabase/policies.sql` après création des tables (si non gérées via l'interface).
