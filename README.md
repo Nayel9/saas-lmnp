@@ -208,3 +208,14 @@ Ajouter un nouveau mapping:
 Comptes non mappés: ignorés silencieusement (extensible ultérieurement: warning ou fallback). Pour étendre à d'autres formulaires (2033A, 2033E), ajouter des règles avec `form` différent puis filtrer côté service/API.
 
 Résultat courant: helper `computeResultatCourant(rubriques)` calcule (Produits nets - Charges) où Produits nets = `CA` - `CA_Moins`.
+
+## Catalogue de comptes (PCG)
+Fichier: `config/accounts-catalog.json` – liste d'objets `{ code, label, description, appliesTo:["achat"|"vente"...], rubrique }`.
+Utilisation:
+- Formulaires Achats/Ventes: dropdown avec recherche plein texte (code, label, description) + fallback saisie libre.
+- Validation: un compte explicitement associé à l'autre journal est rejeté (ex: 706 dans Achats → erreur). Codes hors catalogue acceptés mais marqués "Non mappé" avec suggestion (prefix match le plus pertinent).
+Extension:
+1. Ajouter entrée JSON (tri par code facultatif).
+2. (Optionnel) Ajouter test dans `accountsCatalog.test.ts`.
+3. Lancer `pnpm test`.
+Fonctions utilitaires: `listFor(type)`, `isAllowed(code,type)`, `findClosest(code,type)`, `searchAccounts(q,type)`.
