@@ -145,6 +145,18 @@ Exports: `/api/reports/ledger/export?account_code=...&format=csv|pdf` (+ from/to
 Intégration: depuis la Balance, lien "Grand livre" pré-remplit compte & période.
 Limites: pas de pagination (warning si volumétrie à implémenter plus tard).
 
+### 2033-C (Compte de résultat simplifié)
+Page: `/reports/2033c` (admin).
+Filtres: `from`, `to`, `q` (designation|tier|account_code), `account_code`.
+API JSON: `/api/reports/2033c` → `{ rubriques: [...], totals: { produits, charges, amortissements, resultat } }`.
+Export XLSX: `/api/reports/2033c/export?format=xlsx` (onglets `2033C`, `Meta`). Header `X-Truncated: true` si > limites.
+Structure UI:
+- Produits: CA, Rabais (négatif)
+- Charges: externes, assurances, impôts, services (selon mapping dynamique)
+- Dotations: amortissements (6811*)
+Totaux calculés: Total Produits, Total Charges, Dotations, Résultat = Produits - Charges - Dotations.
+Extension: ajouter prefixes dans `config/config-pcg.json` (form 2033C). La page reflète automatiquement.
+
 ## Intégration Continue (CI)
 Pipeline GitHub Actions (workflow `ci.yml`) : lint, typecheck, tests unitaires, build et e2e Playwright (artefacts exports dans `e2e-exports`). Variables d'environnement injectées via secrets (Supabase + DB). Pour reproduire en local :
 ```bash
