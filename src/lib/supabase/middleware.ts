@@ -10,28 +10,30 @@ const secureCookieBase = {
 };
 
 /**
- * Fabrique un client Supabase pour le middleware (Edge) tout en conservant la capacité de définir des cookies.
+ * Fabrique un client Supabase pour le middleware (Edge) tout en conservant la capacité de définir/supprimer les cookies.
  */
 export function createSupabaseMiddleware(request: NextRequest) {
-    let response = NextResponse.next({
-        request: { headers: request.headers },
-    });
-    const supabase = createServerClient(
-        env.NEXT_PUBLIC_SUPABASE_URL,
-        env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll().map(({name, value}) => ({name, value}));
-                },
-                setAll(cookiesToSet) {
-                    response = NextResponse.next({ request });
-                    cookiesToSet.forEach(({name, value, options}) => {
-                        response.cookies.set(name, value, { ...secureCookieBase, ...options });
-                    });
-                },
-            },
+  let response = NextResponse.next({ request: { headers: request.headers } });
+
+  const supabase = createServerClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
         },
-    );
-    return {supabase, response};
+        set(name: string, value: string, options) {
+          // Met à jour le cookie côté réponse (et redérive une nouvelle response)
+            response = NextResponse.next({ request: { headers: request.headers } });
+            response.cookies.set(name, value, { ...secureCookieBase, ...options });
+        },
+        remove(name: string, options) {
+            response = NextResponse.next({ request: { headers: request.headers } });
+            response.cookies.set(name, "", { ...secureCookieBase, ...options, maxAge: 0 });
+        },
+      },
+    },
+  );
+  return { supabase, response };
 }
