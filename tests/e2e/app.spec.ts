@@ -211,6 +211,15 @@ let achatEditedGlobal: string | undefined;
       page.click('a:has-text("Export XLSX")')
     ]);
     expect(await export2033c[0].path()).toBeTruthy();
+
+    // 2033E
+    await page.goto('/reports/2033e');
+    await expect(page.locator('h1:has-text("État des amortissements 2033-E")')).toBeVisible();
+    const export2033e = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('a:has-text("Export XLSX")')
+    ]);
+    expect(await export2033e[0].path()).toBeTruthy();
   });
 
   test('5) RLS second utilisateur iso', async ({ browser }) => {
