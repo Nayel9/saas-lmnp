@@ -112,14 +112,38 @@ let achatEditedGlobal: string | undefined;
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${venteLabel}")`).first()).toBeVisible();
 
-    // Export XLSX ventes
-    const xlsxDownload = await Promise.all([
-      page.waitForEvent('download'),
-      page.click('a:has-text("Export XLSX")')
-    ]);
-    const xlsxPath = await xlsxDownload[0].path();
-    expect(xlsxPath).toBeTruthy();
-    saveDownloadCopy(xlsxPath, `journal-ventes-${UNIQUE_RUN_ID}.xlsx`);
+    // Achats: tentative compte interdit (706) => erreur
+    await page.goto('/journal/achats');
+    await page.locator('button:has-text("Ajouter")').click();
+    const achatBad = uniq('Achat Interdit');
+    await page.fill('input[name="designation"]', achatBad);
+    await page.fill('input[name="account_code"]', '706');
+    await page.fill('input[name="amount"]', '10');
+    await page.click('button:has-text("Enregistrer")');
+    await expect(page.locator('text=Compte réservé aux ventes')).toBeVisible();
+    // Fermer modal via Annuler
+    await page.click('button:has-text("Annuler")');
+
+    // Achats: saisie libre non mappée 601 (acceptée)
+    await page.locator('button:has-text("Ajouter")').click();
+    const achatLibre = uniq('Achat Libre 601');
+    await page.fill('input[name="designation"]', achatLibre);
+    await page.fill('input[name="account_code"]', '601');
+    await page.fill('input[name="amount"]', '55');
+    await page.click('button:has-text("Enregistrer")');
+    await expect(page.locator(`td:has-text("${achatLibre}")`)).toBeVisible();
+    await expect(page.locator('td:has-text("601")').first()).toBeVisible();
+
+    // Ventes: tentative compte interdit (606) => erreur
+    await page.goto('/journal/ventes');
+    await page.locator('button:has-text("Ajouter")').click();
+    const venteBad = uniq('Vente Interdite 606');
+    await page.fill('input[name="designation"]', venteBad);
+    await page.fill('input[name="account_code"]', '606');
+    await page.fill('input[name="amount"]', '10');
+    await page.click('button:has-text("Enregistrer")');
+    await expect(page.locator('text=Compte réservé aux achats')).toBeVisible();
+    await page.click('button:has-text("Annuler")');
   });
 
   test('3) Immobilisation + amortissement + exports', async ({ page }) => {
