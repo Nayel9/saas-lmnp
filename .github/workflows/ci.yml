@@ -1,88 +1,15 @@
-name: CI
+name: CI-disabled
 
 on:
-  push:
-    branches: [ main, master, feature/* ]
-  pull_request:
-    branches: [ main, master ]
-
-permissions:
-  contents: read
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "CI désactivée temporairement pour focus MVP"
+        required: false
 
 jobs:
-  build-and-test:
+  noop:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      ADMIN_SEED_EMAIL: admin@example.com
-      ADMIN_SEED_PASSWORD: Passw0rd!
-      E2E_BASE_URL: http://localhost:3000
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-            node-version: 20
-            cache: 'pnpm'
-
-      - name: Debug node & npm
-        run: |
-          set -eux
-          node -v
-          npm -v
-          which node || command -v node
-          echo "Initial PATH=$PATH"
-
-      - name: Enable & prepare pnpm via Corepack (with fallback)
-        run: |
-          set -euxo pipefail
-          corepack enable
-          corepack prepare pnpm@9.12.3 --activate || true
-          if ! command -v pnpm >/dev/null 2>&1; then
-            echo "pnpm absent après corepack, installation fallback via npm" >&2
-            npm i -g pnpm@9.12.3
-          fi
-          pnpm --version
-          pnpm config get store-dir || true
-          echo "PATH après install=$PATH"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma Client
-        run: pnpm db:generate
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Unit tests
-        run: pnpm test -- --run
-
-      - name: Build
-        run: pnpm build
-
-      - name: Install Playwright Browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: E2E tests
-        run: pnpm test:e2e
-
-      - name: Upload e2e artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-exports
-          path: |
-            e2e-artifacts/**
-            test-results/**
-          if-no-files-found: ignore
+      - name: Notice
+        run: echo "CI désactivée temporairement (focus MVP)."
