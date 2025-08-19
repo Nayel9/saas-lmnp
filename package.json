@@ -28,8 +28,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
-    "preview:fast": "next start",
-    "preview": "node scripts/preview.js"
+    "test:unit":"dotenv -e .env.test -- vitest run"
   },
   "dependencies": {
     "@mantine/core": "^8.2.4",
