@@ -163,6 +163,12 @@ API JSON: `/api/reports/2033e?year=YYYY[&q=...]` -> `{ year, rows:[{asset_id,lab
 Export XLSX: `/api/reports/2033e/export?year=YYYY` (onglets `2033E`, `Meta`). Prorata temporis 1ère année (mois restants) et arrondis identiques à `computeLinearAmortization`.
 Troncation: >10k actifs (header `X-Truncated: true`).
 
+### 2033-A (Bilan simplifié v1)
+Page: `/reports/2033a` (admin). Paramètre `year` (défaut année courante) + filtre `q` sur labels assets.
+API JSON: `/api/reports/2033a?year=YYYY` → champs: immobilisations_brutes, amortissements_cumules, immobilisations_nettes, tresorerie (0 v1), actif_total, capitaux_propres_equilibrage (pour équilibrage), count_assets, truncated.
+Export XLSX: `/api/reports/2033a/export?year=YYYY` (onglets `2033A_Actif`, `2033A_Passif`, `Meta`).
+Limites v1: pas de dettes/détails trésorerie; capitaux propres calculés comme variable d’équilibre. Évolutions: ajout comptes tiers, dettes financières, disponibilités.
+
 ## Intégration Continue (CI)
 Pipeline GitHub Actions (workflow `ci.yml`) : lint, typecheck, tests unitaires, build et e2e Playwright (artefacts exports dans `e2e-exports`). Variables d'environnement injectées via secrets (Supabase + DB). Pour reproduire en local :
 ```bash

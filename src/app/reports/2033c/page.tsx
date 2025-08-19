@@ -5,8 +5,6 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
-interface Search { from?: string|null; to?: string|null; q?: string|null; account_code?: string|null; }
-
 export default async function C2033CPage({ searchParams }: { searchParams: Promise<Record<string,string|string[]|undefined>> }) {
   const sp = await searchParams;
   const from = sp.from as string | undefined;
@@ -29,8 +27,9 @@ export default async function C2033CPage({ searchParams }: { searchParams: Promi
   const chargesRows = data.rubriques.filter(r => !['CA','CA_Moins','DotationsAmortissements'].includes(r.rubrique));
   const dotationsRows = [ get('DotationsAmortissements') ].filter(Boolean);
 
-  function montantProduit(r:any){ if(!r) return 0; if(r.rubrique==='CA') return r.total_credit - r.total_debit; if(r.rubrique==='CA_Moins') return -(r.total_debit - r.total_credit); return 0; }
-  function montantCharge(r:any){ if(!r) return 0; return r.total_debit - r.total_credit; }
+  type RRow = { rubrique: string; label: string; total_debit: number; total_credit: number } | undefined;
+  function montantProduit(r: RRow){ if(!r) return 0; if(r.rubrique==='CA') return r.total_credit - r.total_debit; if(r.rubrique==='CA_Moins') return -(r.total_debit - r.total_credit); return 0; }
+  function montantCharge(r: RRow){ if(!r) return 0; return r.total_debit - r.total_credit; }
 
   return <main className="p-6 max-w-5xl mx-auto space-y-6">
     <header className="flex items-center justify-between">
@@ -129,4 +128,3 @@ export default async function C2033CPage({ searchParams }: { searchParams: Promi
     </section>
   </main>;
 }
-

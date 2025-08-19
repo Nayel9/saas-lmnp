@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (!user) return new Response('Unauthorized', { status: 401 });
   try { assertAdmin(user); } catch { return new Response('Forbidden', { status: 403 }); }
   const { searchParams } = new URL(req.url);
-  const format = searchParams.get('format') === 'xlsx' ? 'xlsx' : 'xlsx';
+  // Format fixé à XLSX (unique support pour l'instant)
   const from = searchParams.get('from');
   const to = searchParams.get('to');
   const q = searchParams.get('q');

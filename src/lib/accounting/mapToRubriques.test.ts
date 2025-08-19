@@ -68,7 +68,7 @@ describe('mapToRubriques', () => {
   it('ignore montants NaN ou comptes non mappés', () => {
     const { rubriques } = mapToRubriques([
       entry({ type: 'vente', account_code: '999', amount: 500 }), // non mappé
-      entry({ type: 'achat', account_code: '606', amount: 'abc' as any }), // NaN
+      entry({ type: 'achat', account_code: '606', amount: 'abc' as unknown as number }), // NaN (cast volontaire)
       entry({ type: 'vente', account_code: '706', amount: 50 }),
     ]);
     expect(rubriques.find(r=> r.rubrique==='CA')?.total_credit).toBe(50);
@@ -89,4 +89,3 @@ describe('computeResultatCourant', () => {
     expect(res).toBe(55);
   });
 });
-
