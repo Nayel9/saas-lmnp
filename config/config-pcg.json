@@ -1,0 +1,12 @@
+[
+  { "account_prefix": "706",  "rubrique": "CA",                    "form": "2033C", "label": "Chiffre d’affaires" },
+  { "account_prefix": "709",  "rubrique": "CA_Moins",               "form": "2033C", "label": "Rabais / ristournes" },
+  { "account_prefix": "606",  "rubrique": "ChargesExternes",        "form": "2033C", "label": "Achats non stockés" },
+  { "account_prefix": "613",  "rubrique": "ChargesExternes",        "form": "2033C", "label": "Locations / charges" },
+  { "account_prefix": "615",  "rubrique": "ChargesExternes",        "form": "2033C", "label": "Entretien / maintenance" },
+  { "account_prefix": "616",  "rubrique": "Assurances",             "form": "2033C", "label": "Assurances" },
+  { "account_prefix": "62",   "rubrique": "ServicesExterieurs",     "form": "2033C", "label": "Services extérieurs (autres)" },
+  { "account_prefix": "635",  "rubrique": "ImpotsTaxes",            "form": "2033C", "label": "Impôts et taxes" },
+  { "account_prefix": "6811", "rubrique": "DotationsAmortissements", "form": "2033C", "label": "Dotations aux amortissements" }
+]
+
