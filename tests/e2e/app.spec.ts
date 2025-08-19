@@ -202,6 +202,15 @@ let achatEditedGlobal: string | undefined;
       expect(await ledgerCsv[0].path()).toBeTruthy();
       saveDownloadCopy(await ledgerCsv[0].path(), `ledger-${UNIQUE_RUN_ID}.csv`);
     }
+
+    // 2033C
+    await page.goto('/reports/2033c');
+    await expect(page.locator('h1:has-text("Compte de résultat 2033-C")')).toBeVisible();
+    const export2033c = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('a:has-text("Export XLSX")')
+    ]);
+    expect(await export2033c[0].path()).toBeTruthy();
   });
 
   test('5) RLS second utilisateur iso', async ({ browser }) => {
