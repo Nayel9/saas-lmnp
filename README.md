@@ -219,3 +219,15 @@ Extension:
 2. (Optionnel) Ajouter test dans `accountsCatalog.test.ts`.
 3. Lancer `pnpm test`.
 Fonctions utilitaires: `listFor(type)`, `isAllowed(code,type)`, `findClosest(code,type)`, `searchAccounts(q,type)`.
+
+## Seed de démo
+Commandes:
+- `pnpm db:seed:demo` (insère/maj écritures & assets suffixés "[seed]")
+- `pnpm db:unseed:demo` (supprime uniquement ces données)
+Variables requises: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD.
+Scénarios après seed:
+- Journaux: /journal/achats et /journal/ventes (filtres 2025)
+- 2033C: période 2025 (CA = 2400, rabais -50, charges achats ≈ 1602.5)
+- 2033E: années 2024 & 2025 (deux immobilisations)
+- 2033A: années 2024 & 2025 (nettes cohérentes)
+Idempotence: ré-exécuter la commande n’insère pas de doublon.

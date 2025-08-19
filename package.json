@@ -13,7 +13,8 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:format": "prisma format",
-    "db:seed:demo": "node scripts/seed-demo.js",
+    "db:seed:demo": "tsx scripts/dbSeedDemo.ts",
+    "db:unseed:demo": "tsx scripts/dbUnseedDemo.ts",
     "db:test": "dotenv -e .env -- node scripts/test-db.js",
     "db:test:pg": "dotenv -e .env -- node scripts/test-pg.js",
     "db:diagnose": "dotenv -e .env -- node scripts/diagnose-network.js",
@@ -63,6 +64,7 @@
     "prisma": "^6.14.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5",
+    "tsx": "^4.15.7",
     "vitest": "^1.6.0"
   },
   "engines": {
