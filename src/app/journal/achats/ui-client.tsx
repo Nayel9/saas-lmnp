@@ -2,7 +2,9 @@
 import React, { useState, useTransition } from 'react';
 import { z } from 'zod';
 import { formatDateISO } from '@/lib/format';
+import { isAllowed } from '@/lib/accounting/accountsCatalog';
 import { createEntry, updateEntry } from './actions';
+import { AccountCodeSelector } from '@/components/AccountCodeSelector';
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -32,6 +34,11 @@ export default function JournalAchatsClient() {
       setError('Validation: ' + parsed.error.issues.map(i => i.message).join(', '));
       return;
     }
+    // Validation catalogue côté client (soft): empêcher compte explicitement ventes
+    if (isAllowed(parsed.data.account_code, 'vente') && !isAllowed(parsed.data.account_code,'achat')) {
+      setError('Compte réservé aux ventes');
+      return;
+    }
     startTransition(async () => {
       const res: ActionResult = await createEntry(fd);
       if (!res?.ok) setError(res?.error || 'Erreur inconnue');
@@ -50,7 +57,7 @@ export default function JournalAchatsClient() {
               <input name="date" type="date" defaultValue={formatDateISO(new Date())} className="input w-full" />
               <input name="designation" placeholder="Désignation" className="input w-full" />
               <input name="tier" placeholder="Tier (optionnel)" className="input w-full" />
-              <input name="account_code" placeholder="Compte (ex: 606)" className="input w-full" />
+              <AccountCodeSelector typeJournal="achat" />
               <input name="amount" placeholder="Montant" className="input w-full" />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
@@ -85,6 +92,10 @@ export function EditButton({ entry }: EditButtonProps) {
       setError('Validation: ' + parsed.error.issues.map(i => i.message).join(', '));
       return;
     }
+    if (isAllowed(parsed.data.account_code, 'vente') && !isAllowed(parsed.data.account_code,'achat')) {
+      setError('Compte réservé aux ventes');
+      return;
+    }
     startTransition(async () => {
       const res: ActionResult = await updateEntry(fd);
       if (!res?.ok) setError(res?.error || 'Erreur inconnue');
@@ -103,7 +114,7 @@ export function EditButton({ entry }: EditButtonProps) {
               <input name="date" type="date" defaultValue={formatDateISO(entry.date)} className="input w-full" />
               <input name="designation" defaultValue={entry.designation} className="input w-full" />
               <input name="tier" defaultValue={entry.tier || ''} className="input w-full" />
-              <input name="account_code" defaultValue={entry.account_code} className="input w-full" />
+              <AccountCodeSelector typeJournal="achat" defaultValue={entry.account_code} />
               <input name="amount" defaultValue={entry.amount} className="input w-full" />
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
