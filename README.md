@@ -7,6 +7,8 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 ## Scripts principaux
 - `pnpm dev` (Turbopack + Tailwind CLI watch)
 - `pnpm build`
+- `pnpm preview` (prévisualisation prod intelligente: rebuild seulement si nécessaire)
+- `pnpm preview:fast` (démarre directement `next start` en supposant la build à jour)
 - `pnpm css:dev` / `pnpm css:build`
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:push` / `pnpm db:studio` / `pnpm db:format`
 - `pnpm db:seed:demo` (seed démo propriétés + immobilisations + écritures journal)
@@ -155,3 +157,30 @@ pnpm test:e2e
 
 ---
 RLS: exécuter `supabase/policies.sql` après création des tables (si non gérées via l'interface).
+
+## Extension Mapping PCG -> Rubriques (2033C)
+Le moteur de mapping (P4-A) lit `config/config-pcg.json` (liste d'objets):
+```json
+{
+  "account_prefix": "706",
+  "rubrique": "CA",
+  "form": "2033C",
+  "label": "Chiffre d’affaires"
+}
+```
+Règles:
+- `account_prefix`: préfixe de compte (priorité au plus long si chevauchement: ex. `615` avant `61` ou `6`).
+- `rubrique`: identifiant fonctionnel (ex: `ChargesExternes`, `CA`).
+- `form`: code formulaire cible (actuellement `2033C`).
+- `label`: libellé lisible.
+
+L'utilitaire `mapToRubriques` agrège une liste d'écritures (type achat=Débit / vente=Crédit) en montants par rubrique (+ dataset amortissements `6811*`).
+
+Ajouter un nouveau mapping:
+1. Insérer une nouvelle ligne JSON dans `config/config-pcg.json` (respecter le tri optionnel par granularité si souhaité).
+2. (Optionnel) Ajouter un test ciblé dans `src/lib/accounting/mapToRubriques.test.ts`.
+3. Lancer `pnpm test`.
+
+Comptes non mappés: ignorés silencieusement (extensible ultérieurement: warning ou fallback). Pour étendre à d'autres formulaires (2033A, 2033E), ajouter des règles avec `form` différent puis filtrer côté service/API.
+
+Résultat courant: helper `computeResultatCourant(rubriques)` calcule (Produits nets - Charges) où Produits nets = `CA` - `CA_Moins`.
