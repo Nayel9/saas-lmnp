@@ -7,14 +7,17 @@ export async function middleware(request: NextRequest) {
   const { supabase, response } = createSupabaseMiddleware(request);
   const path = request.nextUrl.pathname;
 
-  if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
+  // Zones nécessitant authentification
+  if (path.startsWith('/dashboard') || path.startsWith('/admin') || path.startsWith('/reports')) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    if (path.startsWith('/admin')) {
+    // Double check admin pour /admin et /reports
+    if (path.startsWith('/admin') || path.startsWith('/reports')) {
       const role = getUserRole(user);
       if (role !== 'admin') {
+        // Rediriger vers dashboard si utilisateur authentifié mais pas admin
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
     }
@@ -24,5 +27,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/reports/:path*'],
 };

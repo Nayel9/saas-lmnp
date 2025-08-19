@@ -2,7 +2,6 @@
   "name": "lmnp-app",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.12.3",
   "scripts": {
     "dev": "concurrently \"next dev --turbopack\" \"pnpm:css:dev\"",
     "build": "pnpm db:generate && pnpm css:build && next build",
@@ -28,8 +27,7 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit"
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@mantine/core": "^8.2.4",

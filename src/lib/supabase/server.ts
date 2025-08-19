@@ -11,27 +11,22 @@ const baseCookieOptions: CookieOptions = {
   maxAge: 60 * 60 * 24 * 30, // 30 jours (aligné sur Supabase par défaut)
 };
 
-interface MutableCookieStore {
-  set?: (name: string, value: string, options?: CookieOptions) => void;
-  getAll: () => { name: string; value: string }[];
-}
-
 /**
  * Client Supabase côté serveur (Server Components, Server Actions, Route Handlers).
  * N'expose que la clé anonyme (jamais la service_role ici).
  */
 export async function createSupabaseServerClient() {
-    const store = (await cookies()) as unknown as MutableCookieStore; // await pour API dynamique Next 15
+    const store = await cookies();
     return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
         cookies: {
-            getAll() {
-                const all = store.getAll();
-                return all.map(({name, value}) => ({name, value}));
+            get(name: string) {
+                try { return store.get(name)?.value; } catch { return undefined; }
             },
-            setAll(cookiesToSet) {
-                cookiesToSet.forEach(({name, value, options}) => {
-                    try { store.set?.(name, value, { ...baseCookieOptions, ...options }); } catch { /* ignore */ }
-                });
+            set(name: string, value: string, options?: CookieOptions) {
+                try { store.set(name, value, { ...baseCookieOptions, ...options }); } catch {/* ignore */}
+            },
+            remove(name: string, options?: CookieOptions) {
+                try { store.set(name, "", { ...baseCookieOptions, ...options, maxAge: 0 }); } catch {/* ignore */}
             },
         },
     });
