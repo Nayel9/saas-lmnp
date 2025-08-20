@@ -60,18 +60,18 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           </thead>
           <tbody>
             {rows.map(a => (
-              <tr key={a.id} className="border-b last:border-none hover:bg-gray-50">
+              <tr key={a.id} className="border-b last:border-none hover:bg-bg-muted">
                 <td className="py-1 pr-4 whitespace-nowrap">{formatDateISO(a.acquisition_date)}</td>
                 <td className="py-1 pr-4">{a.label}</td>
                 <td className="py-1 pr-4 tabular-nums text-right">{formatAmount(Number(a.amount_ht))}</td>
                 <td className="py-1 pr-4">{a.duration_years} ans</td>
                 <td className="py-1 pr-4">{a.account_code}</td>
-                <td className="py-1 pr-4"><Link href={`/assets/${a.id}/amortization`} className="text-blue-600 text-xs hover:underline">Voir</Link></td>
+                <td className="py-1 pr-4"><Link href={`/assets/${a.id}/amortization`} className="text-brand text-xs hover:underline">Voir</Link></td>
                 <td className="py-1 pr-2 text-right">
                   <EditAssetButton asset={{ id: a.id, label: a.label, amount_ht: Number(a.amount_ht), duration_years: a.duration_years, acquisition_date: a.acquisition_date, account_code: a.account_code }} />
                   <form action={deleteAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={a.id} />
-                    <button className="text-xs text-red-600 hover:underline">Suppr</button>
+                    <button className="text-xs text-[--color-danger] hover:underline">Suppr</button>
                   </form>
                 </td>
               </tr>
@@ -90,4 +90,3 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
     </main>
   );
 }
-

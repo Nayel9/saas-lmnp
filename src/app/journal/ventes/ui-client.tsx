@@ -50,7 +50,7 @@ export default function JournalVentesClient() {
       <button className="btn-primary" onClick={() => { setError(null); setOpen(true); }}>Ajouter</button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-md shadow-md w-full max-w-md p-5 space-y-4">
+          <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
             <h2 className="text-lg font-medium">Nouvelle écriture vente</h2>
             <form onSubmit={onSubmit} className="space-y-3">
               <input name="date" type="date" defaultValue={formatDateISO(new Date())} className="input w-full" />
@@ -62,7 +62,7 @@ export default function JournalVentesClient() {
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
                 <button disabled={isPending} className="btn-primary">{isPending? 'Enregistrement...' : 'Enregistrer'}</button>
               </div>
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
             </form>
           </div>
         </div>
@@ -104,10 +104,10 @@ export function EditButton({ entry }: EditButtonProps) {
 
   return (
     <>
-      <button className="text-xs text-blue-600 hover:underline" onClick={() => { setError(null); setOpen(true); }}>Edit</button>
+      <button className="text-xs text-brand hover:underline" onClick={() => { setError(null); setOpen(true); }}>Edit</button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-md shadow-md w-full max-w-md p-5 space-y-4">
+          <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
             <h2 className="text-lg font-medium">Modifier écriture</h2>
             <form onSubmit={onSubmit} className="space-y-3">
               <input name="date" type="date" defaultValue={formatDateISO(entry.date)} className="input w-full" />
@@ -119,7 +119,7 @@ export function EditButton({ entry }: EditButtonProps) {
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
                 <button disabled={isPending} className="btn-primary">{isPending? 'Sauvegarde...' : 'Mettre à jour'}</button>
               </div>
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
             </form>
           </div>
         </div>

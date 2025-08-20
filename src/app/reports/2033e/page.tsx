@@ -55,7 +55,7 @@ export default async function C2033EPage({ searchParams }: { searchParams: Promi
           </tr>
         </thead>
         <tbody>
-          {data.rows.map(r => <tr key={r.asset_id} className="border-b last:border-none hover:bg-gray-50">
+          {data.rows.map(r => <tr key={r.asset_id} className="border-b last:border-none hover:bg-bg-muted">
             <td className="py-1 pr-4 font-medium">{r.label}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.valeur_origine.toFixed(2)}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.amortissements_anterieurs.toFixed(2)}</td>
@@ -79,4 +79,3 @@ export default async function C2033EPage({ searchParams }: { searchParams: Promi
     </div>
   </main>;
 }
-

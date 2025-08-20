@@ -99,5 +99,36 @@
     "description": "Réductions de loyers ou remises accordées",
     "appliesTo": ["vente"],
     "rubrique": "CA_Moins"
+  },
+
+  { "code": "205",
+    "label": "Logiciels",
+    "description": "Immobilisations incorporelles - logiciels acquis",
+    "appliesTo": ["asset"],
+    "rubrique": "Immobilisations"
+  },
+  { "code": "2135",
+    "label": "Agencements",
+    "description": "Agencements et aménagements",
+    "appliesTo": ["asset"],
+    "rubrique": "Immobilisations"
+  },
+  { "code": "2155",
+    "label": "Matériel",
+    "description": "Matériel technique et industriel",
+    "appliesTo": ["asset"],
+    "rubrique": "Immobilisations"
+  },
+  { "code": "2183",
+    "label": "Mobilier",
+    "description": "Mobilier et matériel de bureau",
+    "appliesTo": ["asset"],
+    "rubrique": "Immobilisations"
+  },
+  { "code": "2184",
+    "label": "Matériel info/bureau",
+    "description": "Matériel informatique et de bureau",
+    "appliesTo": ["asset"],
+    "rubrique": "Immobilisations"
   }
 ]

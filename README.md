@@ -112,6 +112,7 @@ Fonctionnalités:
 - Page `/assets`: liste paginée (20), filtres query: `page`, `from`, `to`, `q`.
 - CRUD (modal ajout / modification, suppression via server action) avec validations Zod + vérif ownership.
 - Champs: label, amount_ht, duration_years, acquisition_date, account_code.
+- Compte immobilisation: sélection OBLIGATOIRE via dropdown filtrable (catalogue PCG `appliesTo:["asset"]`), aucune saisie libre acceptée (validation stricte client & serveur).
 - Page détail `/assets/[id]/amortization`: calcul linéaire avec prorata temporis 1ère année (base mois restants) + export CSV.
 - Calcul: dotation annuelle = montant / durée. 1ère année: dotation * (mois restants/12). Dernière année ajuste les arrondis pour que cumul = montant.
 - Exports: `/api/assets/:id/amortization/export?format=csv`.
@@ -210,15 +211,14 @@ Comptes non mappés: ignorés silencieusement (extensible ultérieurement: warni
 Résultat courant: helper `computeResultatCourant(rubriques)` calcule (Produits nets - Charges) où Produits nets = `CA` - `CA_Moins`.
 
 ## Catalogue de comptes (PCG)
-Fichier: `config/accounts-catalog.json` – liste d'objets `{ code, label, description, appliesTo:["achat"|"vente"...], rubrique }`.
+Fichier: `config/accounts-catalog.json` – liste d'objets `{ code, label, description, appliesTo:["achat"|"vente"|"asset"...], rubrique }`.
 Utilisation:
-- Formulaires Achats/Ventes: dropdown avec recherche plein texte (code, label, description) + fallback saisie libre.
-- Validation: un compte explicitement associé à l'autre journal est rejeté (ex: 706 dans Achats → erreur). Codes hors catalogue acceptés mais marqués "Non mappé" avec suggestion (prefix match le plus pertinent).
-Extension:
-1. Ajouter entrée JSON (tri par code facultatif).
-2. (Optionnel) Ajouter test dans `accountsCatalog.test.ts`.
-3. Lancer `pnpm test`.
-Fonctions utilitaires: `listFor(type)`, `isAllowed(code,type)`, `findClosest(code,type)`, `searchAccounts(q,type)`.
+- Formulaires Achats/Ventes: dropdown avec recherche plein texte + fallback saisie libre (seuls codes explicitement marqués pour le contexte opposé sont bloqués).
+- Immobilisations: dropdown strict (type `asset`) – sélection obligatoire, aucune saisie libre (`account_code` doit être dans la liste).
+Validation:
+- `isAllowed(code,'asset')` doit être vrai pour créer/modifier un asset.
+- Zod côté client: enum dynamique des codes immobilisation.
+- Erreur explicite si sélection d'un compte non autorisé (dropdown PCG filtré par `appliesTo:["asset"]`).
 
 ## Seed de démo
 Commandes:
@@ -231,3 +231,37 @@ Scénarios après seed:
 - 2033E: années 2024 & 2025 (deux immobilisations)
 - 2033A: années 2024 & 2025 (nettes cohérentes)
 Idempotence: ré-exécuter la commande n’insère pas de doublon.
+
+## Landing marketing
+Structure (fichiers sous `src/components/marketing` et page racine `app/page.tsx`):
+- Hero (H1, sous-texte, CTA principal `/login` ou dashboard si authentifié)
+- Features (bénéfices 100% tokens: card, text-brand, etc.)
+- Steps (3 étapes numérotées)
+- Pricing (3 plans: Gratuit / Essentiel / Pro) – CTA identique
+- Testimonials (2 blocks courts)
+- FAQ (questions récurrentes LMNP)
+- Footer (liens légaux, contact)
+
+Design system:
+- Aucun `gray-XXX` / `blue-XXX` dans les nouveaux composants: uniquement tokens (`bg-bg`, `bg-bg-muted`, `text-foreground`, `text-muted-foreground`, `text-brand`, `border-border`, utilitaires `btn-primary`, `card`).
+- Focus: `focus-visible:ring-2 ring-[--color-ring]` via utilitaires.
+- Dark mode: hérite des tokens (`@theme .dark`).
+
+Accessibilité & SEO:
+- Hiérarchie titres: `h1` unique (Hero), sections `h2`, items internes `h3` si nécessaire.
+- Skip link: lien "Aller au contenu" dans `layout.tsx` (focus visible).
+- Métadonnées basiques (title + meta description) dans `layout.tsx`.
+- Liens CTA avec `aria-label` explicite.
+
+Édition du contenu:
+- Modifier textes directement dans les composants (pas encore externalisé i18n).
+- Pour remplacer captures produit: ajouter asset dans `public/` puis insérer un composant `next/image` (placeholder blur) dans Steps ou une nouvelle section.
+
+Tests:
+- `Hero.test.tsx` et `Landing.test.tsx`: vérif présence H1, sections et CTA login/dashboard.
+
+Performance:
+- Pas d’images externes bloquantes pour l’instant, aucun script additionnel.
+- Pas de dépendances nouvelles.
+
+Pour ajuster un plan tarifaire: éditer `plans` dans `Pricing.tsx` (ajouter champ `highlight` pour effet anneau de mise en avant).
