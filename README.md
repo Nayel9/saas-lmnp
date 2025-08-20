@@ -265,3 +265,34 @@ Performance:
 - Pas de dépendances nouvelles.
 
 Pour ajuster un plan tarifaire: éditer `plans` dans `Pricing.tsx` (ajouter champ `highlight` pour effet anneau de mise en avant).
+
+## Auth UI (L1)
+Refactor complet de `/login`.
+
+Fonctionnalités livrées:
+- Navbar minimale sur /login (logo + Accueil) conservant le skip link global.
+- Carte d’authentification centrée (tokens Tailwind v4: `card`, `btn`, `btn-primary`, `input`).
+- 3 modes accessibles via onglets (boutons rôle `tab`):
+  - Se connecter (email + mot de passe)
+  - Créer un compte (email + mot de passe)
+  - Magic link (email seul)
+- Boutons SSO Google & Apple présents mais désactivés (`aria-disabled`, tooltip “Bientôt”).
+- Accessibilité: hiérarchie titres (h1), labels associés, `aria-live="polite"` pour messages, focus visible via tokens ring.
+- Redirection automatique vers `/dashboard` après authentification (listener Supabase).
+- Validation basique (email format, mot de passe >=6 caractères, bouton désactivé sinon).
+- Tests unitaires (snapshot de structure simplifiée) vérifiant présence des 3 modes, champs et zone aria-live.
+- Metadata page (title + description) exposée côté serveur.
+
+Prochaines étapes prévues:
+- (L2) Gestion d’erreurs plus granulaires + indicateurs de chargement fins + redirections conditionnelles (post-signup email non confirmé).
+- (L3) Activation SSO Google (configuration Supabase + bouton actif).
+- (L4) Activation SSO Apple + fusion comptes / sécurisation supplémentaire MFA optionnelle.
+
+Guidelines design:
+- Uniquement tokens couleurs & utilitaires (pas de classes Tailwind brutes hors spacing/layout occasionnel).
+- Responsive mobile-first: largeur max `max-w-md`. Aucun layout additionnel requis (layout global suffisant).
+
+Tests:
+```bash
+pnpm test -- -t "LoginPage UI (L1)"
+```
