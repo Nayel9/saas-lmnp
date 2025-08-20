@@ -1,12 +1,12 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth/core';
 import { redirect } from 'next/navigation';
 import { getUserRole } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) redirect('/login');
   const role = getUserRole(user);
   if (role !== 'admin') redirect('/dashboard');

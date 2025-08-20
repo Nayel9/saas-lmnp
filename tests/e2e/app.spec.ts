@@ -1,54 +1,49 @@
 import { test, expect, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // pour création second user
+const prisma = new PrismaClient();
 
 async function ensureAdminCreds() {
   let email = process.env.ADMIN_SEED_EMAIL;
   let password = process.env.ADMIN_SEED_PASSWORD;
   if (!email || !password) {
-    // créer un user admin éphémère si service key dispo
-    if (!SERVICE_KEY) throw new Error('ADMIN_SEED_* manquants et pas de SERVICE ROLE key');
     email = `admin-e2e-${Date.now()}@local.test`;
     password = 'Passw0rd!';
-    const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { error } = await supa.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { role: 'admin' }, app_metadata: { role: 'admin' } });
-    if (error) throw error;
-    process.env.ADMIN_SEED_EMAIL = email;
-    process.env.ADMIN_SEED_PASSWORD = password;
   }
-  return { email, password } as { email: string; password: string };
+  const existing = await prisma.user.findUnique({ where: { email } });
+  const hash = await bcrypt.hash(password, 10);
+  if (!existing) {
+    await prisma.user.create({ data: { email, password: hash, role: 'admin' } });
+  } else if (existing.role !== 'admin' || !existing.password) {
+    await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin', password: hash } });
+  }
+  return { email: email!, password: password! };
 }
 
 async function createIsolatedUser(): Promise<{ email: string; password: string }> {
-  if (!SERVICE_KEY) throw new Error('SERVICE ROLE requis pour test RLS');
   const email = `user2-${Date.now()}@local.test`;
   const password = 'Passw0rd!';
-  const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { error } = await supa.auth.admin.createUser({ email, password, email_confirm: true });
-  if (error) throw error;
+  const hash = await bcrypt.hash(password, 10);
+  await prisma.user.create({ data: { email, password: hash, role: 'user' } });
   return { email, password };
 }
 
 async function uiLogin(page: Page, email: string, password: string) {
   await page.goto('/login');
-  // Supabase Auth UI: first input email, second password, button with data-provider or label
   const emailInput = page.locator('input[type="email"]');
   await emailInput.waitFor();
   await emailInput.fill(email);
   const pwdInput = page.locator('input[type="password"]');
   await pwdInput.fill(password);
-  // submit button (Supabase Auth UI renders button[type=submit])
-  await page.locator('button[type="submit"]:not([disabled])').first().click();
+  await page.locator('button[type="submit"]').click();
   await page.waitForURL(/.*dashboard.*/);
 }
 
 async function uiLogout(page: Page) {
   await page.locator('button:has-text("Déconnexion")').click();
-  // Accepter redirection vers / (implémentation actuelle) ou /login (ancien comportement)
   await page.waitForURL(url => /\/login$/.test(url.pathname) || /\/$/.test(url.pathname));
 }
 
@@ -57,11 +52,9 @@ function uniq(label: string) { return `${label}-${UNIQUE_RUN_ID}`; }
 async function retry<T>(fn:()=>Promise<T>, attempts=3, delay=500): Promise<T> { let lastErr:any; for (let i=0;i<attempts;i++){ try { return await fn(); } catch(e){ lastErr=e; if(i<attempts-1) await new Promise(r=>setTimeout(r,delay)); } } throw lastErr; }
 function parseMoney(txt: string): number { const cleaned = txt.replace(/\s|\u202F|\u00A0/g,'').replace(/[^0-9,.-]/g,'').replace(/(,)(?=[0-9]{3}\b)/g,'').replace(',', '.'); const n = parseFloat(cleaned); return isNaN(n)?0:n; }
 
-// Lignes partagées entre tests (RLS)
 let achatEditedGlobal: string | undefined;
 
-// Tests en série pour réutiliser les créations
- test.describe.serial('E2E scénario complet', () => {
+test.describe.serial('E2E scénario complet', () => {
   test('1) Auth admin login/logout', async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
@@ -72,8 +65,6 @@ let achatEditedGlobal: string | undefined;
   test('2) Journaux achats & ventes CRUD + exports', async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
-
-    // Achats: créer
     await page.goto('/journal/achats');
     await page.locator('button:has-text("Ajouter")').click();
     const achatInitial = uniq('E2E Achat Test');
@@ -87,14 +78,12 @@ let achatEditedGlobal: string | undefined;
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${achatInitial}")`)).toBeVisible();
 
-    // Editer
     await page.locator(`tr:has(td:has-text("${achatInitial}")) button:has-text("Edit")`).click();
     await page.fill('input[name="designation"]', achatEdited);
     await page.click('button:has-text("Mettre à jour")');
     await expect(page.locator(`td:has-text("${achatEdited}")`).first()).toBeVisible();
     await expect(page.locator(`td:has-text("${achatInitial}")`)).toHaveCount(0);
 
-    // Export PDF (download)
     const pdfDownload = await Promise.all([
       page.waitForEvent('download'),
       page.click('a:has-text("Export PDF")')
@@ -103,7 +92,6 @@ let achatEditedGlobal: string | undefined;
     expect(pdfPath).toBeTruthy();
     saveDownloadCopy(pdfPath, `journal-achats-${UNIQUE_RUN_ID}.pdf`);
 
-    // Ventes
     await page.goto('/journal/ventes');
     await page.locator('button:has-text("Ajouter")').click();
     const venteLabel = uniq('E2E Vente Test');
@@ -115,7 +103,6 @@ let achatEditedGlobal: string | undefined;
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${venteLabel}")`).first()).toBeVisible();
 
-    // Achats: tentative compte interdit (706) => erreur
     await page.goto('/journal/achats');
     await page.locator('button:has-text("Ajouter")').click();
     const achatBad = uniq('Achat Interdit');
@@ -126,10 +113,8 @@ let achatEditedGlobal: string | undefined;
     await page.fill('input[name="amount"]', '10');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator('text=Compte réservé aux ventes')).toBeVisible();
-    // Fermer modal via Annuler
     await page.click('button:has-text("Annuler")');
 
-    // Achats: saisie libre non mappée 601 (acceptée)
     await page.locator('button:has-text("Ajouter")').click();
     const achatLibre = uniq('Achat Libre 601');
     await page.fill('input[name="designation"]', achatLibre);
@@ -141,7 +126,6 @@ let achatEditedGlobal: string | undefined;
     await expect(page.locator(`td:has-text("${achatLibre}")`)).toBeVisible();
     await expect(page.locator('td:has-text("601")').first()).toBeVisible();
 
-    // Ventes: tentative compte interdit (606) => erreur
     await page.goto('/journal/ventes');
     await page.locator('button:has-text("Ajouter")').click();
     const venteBad = uniq('Vente Interdite 606');
@@ -159,15 +143,11 @@ let achatEditedGlobal: string | undefined;
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
     await page.goto('/assets');
-
-    // Ouvrir modal et vérifier blocage sans sélection
     await page.locator('button:has-text("Ajouter")').click();
     const submitBtn = page.locator('button:has-text("Enregistrer")');
     await expect(submitBtn).toBeDisabled();
-    // Fermer
     await page.locator('button:has-text("Annuler")').click();
 
-    // Création valide avec compte 2183
     const assetLabel = uniq('Machine E2E');
     await page.locator('button:has-text("Ajouter")').click();
     await page.fill('input[name="label"]', assetLabel);
@@ -181,7 +161,6 @@ let achatEditedGlobal: string | undefined;
     await submitBtn.click();
     await expect(page.locator(`td:has-text("${assetLabel}")`)).toBeVisible();
 
-    // Tentative forcer code serveur 706 (manipule champ caché après sélection 2183)
     await page.locator('button:has-text("Ajouter")').click();
     await page.fill('input[name="label"]', uniq('Asset Invalide 706'));
     await page.fill('input[name="amount_ht"]', '1000');
@@ -190,16 +169,11 @@ let achatEditedGlobal: string | undefined;
     const accountSearch2 = page.locator('input[aria-label="Recherche compte comptable"]');
     await accountSearch2.fill('2184');
     await page.locator('button:has-text("2184")').first().click();
-    // Override hidden value (simulate spoof)
     await page.evaluate(() => { const el = document.querySelector('input[type="hidden"][name="account_code"]') as HTMLInputElement | null; if (el) el.value = '706'; });
-    const submitSpoof = page.locator('button:has-text("Enregistrer")');
-    await submitSpoof.click();
-    // Erreur attendue (enum invalide -> message contient 706)
+    await page.locator('button:has-text("Enregistrer")').click();
     await expect(page.locator('text=706')).toBeVisible();
-    // Annuler modal
     await page.locator('button:has-text("Annuler")').click();
 
-    // Accéder amortissement asset valide
     await page.click(`tr:has(td:has-text("${assetLabel}")) a:has-text("Voir")`);
     await expect(page.locator(`h1:has-text("Amortissement - ${assetLabel}")`)).toBeVisible();
     const id = page.url().split('/').slice(-2)[0];
@@ -229,20 +203,15 @@ let achatEditedGlobal: string | undefined;
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
     await page.goto('/reports/balance');
-    // Attendre qu'au moins une ligne apparaisse ou vide
     await expect(page.locator('table')).toBeVisible();
-    // Exports
     const balCsv = await Promise.all([page.waitForEvent('download'), page.click('a:has-text("Export CSV")')]);
     expect(await balCsv[0].path()).toBeTruthy();
     saveDownloadCopy(await balCsv[0].path(), `balance-${UNIQUE_RUN_ID}.csv`);
     const balPdf = await Promise.all([page.waitForEvent('download'), page.click('a:has-text("Export PDF")')]);
     const balPdfPath = await balPdf[0].path();
     expect(balPdfPath).toBeTruthy();
-    if (balPdfPath) {
-      saveDownloadCopy(balPdfPath, `balance-${UNIQUE_RUN_ID}.pdf`);
-    }
+    if (balPdfPath) saveDownloadCopy(balPdfPath, `balance-${UNIQUE_RUN_ID}.pdf`);
 
-    // Vérification cohérence totaux si au moins une ligne
     const rowCount = await page.locator('tbody tr').count();
     if (rowCount > 0) {
       const footerDebit = parseMoney(await page.locator('tfoot td').nth(1).innerText());
@@ -251,18 +220,16 @@ let achatEditedGlobal: string | undefined;
       expect(Number((footerDebit - footerCredit).toFixed(2))).toBe(Number(footerBalance.toFixed(2)));
     }
 
-    // Grand Livre (ouvrir via lien première ligne si existe)
     const firstAccount = page.locator('tbody tr td:first-child').first();
     const accText = await firstAccount.textContent();
     if (accText) {
       await page.click(`a[href*="/reports/ledger?account_code=${accText.trim()}"]`);
-      await expect(page.locator('h1:has-text("Grand Livre")')).toBeVisible();
+      await expect(page.locator('h1:has-text("Grand livre")')).toBeVisible();
       const ledgerCsv = await Promise.all([page.waitForEvent('download'), page.click('a:has-text("Export CSV")')]);
       expect(await ledgerCsv[0].path()).toBeTruthy();
       saveDownloadCopy(await ledgerCsv[0].path(), `ledger-${UNIQUE_RUN_ID}.csv`);
     }
 
-    // 2033C
     await page.goto('/reports/2033c');
     await expect(page.locator('h1:has-text("Compte de résultat 2033-C")')).toBeVisible();
     const export2033c = await Promise.all([
@@ -271,7 +238,6 @@ let achatEditedGlobal: string | undefined;
     ]);
     expect(await export2033c[0].path()).toBeTruthy();
 
-    // 2033E
     await page.goto('/reports/2033e');
     await expect(page.locator('h1:has-text("État des amortissements 2033-E")')).toBeVisible();
     const export2033e = await Promise.all([
@@ -280,7 +246,6 @@ let achatEditedGlobal: string | undefined;
     ]);
     expect(await export2033e[0].path()).toBeTruthy();
 
-    // 2033A
     await page.goto('/reports/2033a');
     await expect(page.locator('h1:has-text("Bilan simplifié 2033-A")')).toBeVisible();
     const export2033a = await Promise.all([
@@ -290,16 +255,13 @@ let achatEditedGlobal: string | undefined;
     expect(await export2033a[0].path()).toBeTruthy();
   });
 
-  test('5) RLS second utilisateur iso', async ({ browser }) => {
+  test('5) Isolation second utilisateur', async ({ browser }) => {
     await ensureAdminCreds();
     const user2 = await createIsolatedUser();
-    // Browser context séparé
     const context = await browser.newContext();
     const page = await context.newPage();
     await uiLogin(page, user2.email, user2.password);
-    // Journal achats devrait être vide ou sans nos écritures précédentes
     await page.goto('/journal/achats');
-    // Absence de la désignation utilisée dans test 2
     await expect(page.locator(`td:has-text("${achatEditedGlobal||''}")`)).toHaveCount(0);
     await context.close();
   });
@@ -307,9 +269,5 @@ let achatEditedGlobal: string | undefined;
 
 const ARTIFACT_DIR = path.join(process.cwd(), 'e2e-artifacts');
 if (!fs.existsSync(ARTIFACT_DIR)) fs.mkdirSync(ARTIFACT_DIR);
-function saveDownloadCopy(srcPath: string | null, targetBase: string) {
-  if (!srcPath) return;
-  const dest = path.join(ARTIFACT_DIR, targetBase);
-  try { fs.copyFileSync(srcPath, dest); } catch { /* ignore */ }
-}
+function saveDownloadCopy(srcPath: string | null, targetBase: string) { if (!srcPath) return; const dest = path.join(ARTIFACT_DIR, targetBase); try { fs.copyFileSync(srcPath, dest); } catch { /* ignore */ } }
 function saveBuffer(buf: Buffer, targetBase: string){ const dest = path.join(ARTIFACT_DIR, targetBase); try { fs.writeFileSync(dest, buf); } catch {/* ignore */} }

@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { auth } from '@/lib/auth/core';
 import { isAllowed } from '@/lib/accounting/accountsCatalog';
 
 const entrySchema = z.object({
@@ -18,8 +18,8 @@ const entrySchema = z.object({
 export type EntryFormData = z.infer<typeof entrySchema>;
 
 async function getUserId() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) throw new Error('Non authentifié');
   return user.id;
 }

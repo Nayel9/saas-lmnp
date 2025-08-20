@@ -1,15 +1,15 @@
 "use client";
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import { evaluateAccess } from '@/lib/guard';
+import { useSession } from 'next-auth/react';
+import type { ReactNode } from 'react';
+import { getUserRole } from '@/lib/auth';
 
 interface ProtectedRouteProps {
   requiredRole?: 'user' | 'admin';
-  redirectUnauthenticated?: string; // défaut /login
-  redirectForbidden?: string; // défaut /dashboard
-  fallback?: ReactNode; // rendu pendant loading
+  redirectUnauthenticated?: string;
+  redirectForbidden?: string;
+  fallback?: ReactNode;
   children: ReactNode;
 }
 
@@ -26,35 +26,21 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
+  const user = session?.user;
+  const loading = status === 'loading';
+
+  const role = getUserRole(user);
+  const unauthenticated = !loading && !user;
+  const forbidden = !loading && user && requiredRole === 'admin' && role !== 'admin';
 
   useEffect(() => {
-    let active = true;
-    const supabase = getSupabaseBrowserClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!active) return;
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-    return () => { active = false; sub.subscription.unsubscribe(); };
-  }, [pathname]);
+    if (unauthenticated) router.replace(redirectUnauthenticated);
+    else if (forbidden) router.replace(redirectForbidden);
+  }, [unauthenticated, forbidden, router, redirectForbidden, redirectUnauthenticated, pathname]);
 
-  const outcome = evaluateAccess(requiredRole, user, loading);
-
-  useEffect(() => {
-    if (outcome === 'unauthenticated') router.replace(redirectUnauthenticated);
-    else if (outcome === 'forbidden') router.replace(redirectForbidden);
-  }, [outcome, router, redirectUnauthenticated, redirectForbidden]);
-
-  if (outcome === 'loading') return <>{fallback}</>;
-  if (outcome === 'ok') return <>{children}</>;
-  // Dans les cas redirect, on affiche un léger état transitoire (évite flash vide)
-  return <div className="p-6 text-sm text-muted-foreground">Redirection…</div>;
+  if (loading) return <>{fallback}</>;
+  if (unauthenticated) return <div className="p-8 text-sm">Non authentifié</div>;
+  if (forbidden) return <div className="p-6 text-sm text-muted-foreground">Redirection…</div>;
+  return <>{children}</>;
 }
-

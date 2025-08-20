@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { compute2033A } from '@/lib/accounting/compute2033a';
 import * as XLSX from 'xlsx';
+import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
   const year = yearStr ? parseInt(yearStr,10) : new Date().getFullYear();
   if (isNaN(year)) return new Response('Bad year', { status: 400 });
   const q = searchParams.get('q');
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return new Response('Unauthorized', { status: 401 });
-  try { assertAdmin(user); } catch { return new Response('Forbidden', { status: 403 }); }
+  if (getUserRole(user) !== 'admin') return new Response('Forbidden', { status: 403 });
   const r = await compute2033A({ userId: user.id, year, q });
   const wb = XLSX.utils.book_new();
   const actifRows = [
@@ -46,4 +46,3 @@ export async function GET(req: NextRequest) {
   if (r.truncated) headers['X-Truncated'] = 'true';
   return new Response(new Uint8Array(buf), { headers });
 }
-

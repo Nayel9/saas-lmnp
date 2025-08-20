@@ -1,30 +1,17 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getUserRole } from "@/lib/auth";
+import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
+import { getUserRole } from '@/lib/auth';
 
 export function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const { data: session, status } = useSession();
+  const user = session?.user;
   const minimal = pathname === "/login"; // variante minimale sur /login
-
-  useEffect(() => {
-    if (minimal) return; // ne pas initialiser supabase pour la page login
-    const client = getSupabaseBrowserClient();
-    setSupabase(client);
-    let active = true;
-    client.auth.getUser().then(({ data }) => { if (active) setUser(data.user ?? null); });
-    const { data: sub } = client.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => { active = false; sub.subscription.unsubscribe(); };
-  }, [minimal]);
+  const role = getUserRole(user);
 
   if (minimal) {
     return (
@@ -41,12 +28,10 @@ export function NavBar() {
   }
 
   const logout = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    await signOut({ redirect: false });
     router.replace('/');
   };
 
-  const role = getUserRole(user);
   const linkClass = (target: string) => {
     const active = pathname === target;
     return `px-3 py-2 rounded-md text-sm font-medium transition-colors focus-visible:ring-2 ring-[--color-ring] outline-none ${active ? 'bg-bg-muted text-brand' : 'hover:bg-bg-muted'}`;
@@ -62,7 +47,7 @@ export function NavBar() {
         <div className="flex items-center gap-1 ml-2">
           {user && <Link href="/dashboard" aria-current={pathname==='/dashboard'? 'page':undefined} className={linkClass('/dashboard')}>Dashboard</Link>}
           {user && <Link href="/journal/achats" aria-current={pathname==='/journal/achats'? 'page':undefined} className={linkClass('/journal/achats')}>Journal Achats</Link>}
-          {user && <Link href="/journal/ventes" aria-current={pathname==='/journal/ventes'? 'page':undefined} className={linkClass('/journal/ventes')}>Journal Ventes</Link>}
+            {user && <Link href="/journal/ventes" aria-current={pathname==='/journal/ventes'? 'page':undefined} className={linkClass('/journal/ventes')}>Journal Ventes</Link>}
           {user && <Link href="/assets" aria-current={pathname==='/assets'? 'page':undefined} className={linkClass('/assets')}>Immobilisations</Link>}
           {user && role === 'admin' && <Link href="/admin" aria-current={pathname==='/admin'? 'page':undefined} className={linkClass('/admin')}>Admin</Link>}
           {user && role === 'admin' && <Link href="/reports/balance" aria-current={pathname==='/reports/balance'? 'page':undefined} className={linkClass('/reports/balance')}>Balance</Link>}

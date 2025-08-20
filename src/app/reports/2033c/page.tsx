@@ -1,5 +1,5 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { compute2033C } from '@/lib/accounting/compute2033c';
 import Link from 'next/link';
 
@@ -12,11 +12,10 @@ export default async function C2033CPage({ searchParams }: { searchParams: Promi
   const q = sp.q as string | undefined;
   const account_code = sp.account_code as string | undefined;
 
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
-  try { assertAdmin(user); } catch { return <div className="p-8">Accès administrateur requis</div>; }
-
+  if (getUserRole(user) !== 'admin') return <div className="p-8">Accès administrateur requis</div>;
   const data = await compute2033C({ userId: user.id, from, to, q, account_code });
   const hasFilters = !!(from||to||q||account_code);
 

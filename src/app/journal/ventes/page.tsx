@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth/core';
 import { prisma } from '@/lib/prisma';
 import { formatAmount, formatDateISO } from '@/lib/format';
 import Link from 'next/link';
@@ -13,8 +13,8 @@ const PAGE_SIZE = 20;
 
 export default async function JournalVentesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
 
   const page = Math.max(1, parseInt((sp.page as string) || '1', 10));

@@ -1,7 +1,7 @@
 "use server";
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth/core';
 import { revalidatePath } from 'next/cache';
 import { listFor, isAllowed } from '@/lib/accounting/accountsCatalog';
 
@@ -16,8 +16,8 @@ const assetSchema = z.object({
 });
 
 async function getUserId() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) throw new Error('Non authentifié');
   return user.id;
 }

@@ -1,4 +1,31 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+vi.mock('../prisma', () => {
+  interface MockAsset { id: string; user_id: string; label: string; amount_ht: number; duration_years: number; acquisition_date: Date; account_code: string }
+  interface AssetWhereInput { user_id?: string; label?: { contains: string; mode?: string } }
+  interface FindManyArgs { where?: AssetWhereInput; orderBy?: { acquisition_date?: 'asc'|'desc' } }
+  const assets: MockAsset[] = [];
+  function matches(a: MockAsset, where?: AssetWhereInput): boolean {
+    if (!where) return true;
+    if (where.user_id && a.user_id !== where.user_id) return false;
+    if (where.label?.contains && !a.label.toLowerCase().includes(where.label.contains.toLowerCase())) return false;
+    return true;
+  }
+  function findMany({ where, orderBy }: FindManyArgs): Promise<MockAsset[]> {
+    let list = assets.filter(a => matches(a, where));
+    if (orderBy?.acquisition_date){
+      list = list.slice().sort((a,b)=> a.acquisition_date.getTime() - b.acquisition_date.getTime());
+      if (orderBy.acquisition_date === 'desc') list.reverse();
+    }
+    return Promise.resolve(list);
+  }
+  function create({ data }: { data: MockAsset }): Promise<MockAsset> { assets.push(data); return Promise.resolve(data); }
+  function deleteMany({ where }: { where?: AssetWhereInput }): Promise<{ count: number }> {
+    const before = assets.length;
+    for (let i=assets.length-1;i>=0;i--) if (matches(assets[i], where)) assets.splice(i,1);
+    return Promise.resolve({ count: before - assets.length });
+  }
+  return { prisma: { asset: { findMany, create, deleteMany } } };
+});
 import { prisma } from '../prisma';
 import { compute2033E } from './compute2033e';
 
@@ -34,4 +61,3 @@ describe('compute2033E', () => {
     expect(res2025.totals.dotation_exercice).toBeCloseTo(3200, 2);
   });
 });
-
