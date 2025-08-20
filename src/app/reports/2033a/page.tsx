@@ -66,9 +66,8 @@ export default async function C2033APage({ searchParams }: { searchParams: Promi
       </div>
     </div>
     <div className="text-xs flex items-center gap-3">
-      <span>Équilibre: {balanceOK ? <span className="text-green-600 font-medium">OK</span> : <span className="text-red-600 font-medium">Déséquilibré</span>}</span>
+      <span>Équilibre: {balanceOK ? <span className="text-[--color-success] font-medium">OK</span> : <span className="text-[--color-danger] font-medium">Déséquilibré</span>}</span>
       <span className="text-muted-foreground">(Nettes = Brut - Amort. cumulés au 31/12)</span>
     </div>
   </main>;
 }
-

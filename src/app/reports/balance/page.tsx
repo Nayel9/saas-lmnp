@@ -67,7 +67,7 @@ export default async function BalanceReportPage({ searchParams }: { searchParams
         </div>
         <div className="md:col-span-6 flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
           {from && <span>Période: {from} → {to || '…'}</span>}
-          {hasActiveFilter && <span className="px-2 py-0.5 rounded bg-gray-200">Filtre actif</span>}
+          {hasActiveFilter && <span className="badge">Filtre actif</span>}
           <span>Totaux: Débit {total_debit.toFixed(2)} · Crédit {total_credit.toFixed(2)} · Solde {total_balance.toFixed(2)}</span>
         </div>
       </form>
@@ -85,7 +85,7 @@ export default async function BalanceReportPage({ searchParams }: { searchParams
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => <tr key={r.account_code} className="border-b last:border-none hover:bg-gray-50">
+          {rows.map(r => <tr key={r.account_code} className="border-b last:border-none hover:bg-bg-muted">
             <td className="py-1 pr-4 font-medium">{r.account_code}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.total_debit.toFixed(2)}</td>
             <td className="py-1 pr-4 text-right tabular-nums">{r.total_credit.toFixed(2)}</td>

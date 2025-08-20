@@ -48,7 +48,8 @@ async function uiLogin(page: Page, email: string, password: string) {
 
 async function uiLogout(page: Page) {
   await page.locator('button:has-text("Déconnexion")').click();
-  await page.waitForURL(/.*login.*/);
+  // Accepter redirection vers / (implémentation actuelle) ou /login (ancien comportement)
+  await page.waitForURL(url => /\/login$/.test(url.pathname) || /\/$/.test(url.pathname));
 }
 
 const UNIQUE_RUN_ID = Date.now();
@@ -61,8 +62,6 @@ let achatEditedGlobal: string | undefined;
 
 // Tests en série pour réutiliser les créations
  test.describe.serial('E2E scénario complet', () => {
-  let createdAssetId: string | undefined;
-
   test('1) Auth admin login/logout', async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
@@ -81,7 +80,9 @@ let achatEditedGlobal: string | undefined;
     const achatEdited = uniq('E2E Achat Modifié');
     achatEditedGlobal = achatEdited;
     await page.fill('input[name="designation"]', achatInitial);
-    await page.fill('input[name="account_code"]', '606');
+    const achatAccountInput = page.locator('input[aria-label="Recherche compte comptable"]');
+    await achatAccountInput.fill('606');
+    await page.locator('button:has-text("606 –")').first().click();
     await page.fill('input[name="amount"]', '123.45');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${achatInitial}")`)).toBeVisible();
@@ -107,7 +108,9 @@ let achatEditedGlobal: string | undefined;
     await page.locator('button:has-text("Ajouter")').click();
     const venteLabel = uniq('E2E Vente Test');
     await page.fill('input[name="designation"]', venteLabel);
-    await page.fill('input[name="account_code"]', '706');
+    const venteAccInput = page.locator('input[aria-label="Recherche compte comptable"]');
+    await venteAccInput.fill('706');
+    await page.locator('button:has-text("706 –")').first().click();
     await page.fill('input[name="amount"]', '500');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${venteLabel}")`).first()).toBeVisible();
@@ -117,7 +120,9 @@ let achatEditedGlobal: string | undefined;
     await page.locator('button:has-text("Ajouter")').click();
     const achatBad = uniq('Achat Interdit');
     await page.fill('input[name="designation"]', achatBad);
-    await page.fill('input[name="account_code"]', '706');
+    const achatAccountInput2 = page.locator('input[aria-label="Recherche compte comptable"]');
+    await achatAccountInput2.fill('706');
+    await achatAccountInput2.press('Enter');
     await page.fill('input[name="amount"]', '10');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator('text=Compte réservé aux ventes')).toBeVisible();
@@ -128,7 +133,9 @@ let achatEditedGlobal: string | undefined;
     await page.locator('button:has-text("Ajouter")').click();
     const achatLibre = uniq('Achat Libre 601');
     await page.fill('input[name="designation"]', achatLibre);
-    await page.fill('input[name="account_code"]', '601');
+    const achatAccountInput3 = page.locator('input[aria-label="Recherche compte comptable"]');
+    await achatAccountInput3.fill('601');
+    await achatAccountInput3.press('Enter');
     await page.fill('input[name="amount"]', '55');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${achatLibre}")`)).toBeVisible();
@@ -139,7 +146,9 @@ let achatEditedGlobal: string | undefined;
     await page.locator('button:has-text("Ajouter")').click();
     const venteBad = uniq('Vente Interdite 606');
     await page.fill('input[name="designation"]', venteBad);
-    await page.fill('input[name="account_code"]', '606');
+    const venteAccInput2 = page.locator('input[aria-label="Recherche compte comptable"]');
+    await venteAccInput2.fill('606');
+    await venteAccInput2.press('Enter');
     await page.fill('input[name="amount"]', '10');
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator('text=Compte réservé aux achats')).toBeVisible();
@@ -150,29 +159,57 @@ let achatEditedGlobal: string | undefined;
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
     await page.goto('/assets');
+
+    // Ouvrir modal et vérifier blocage sans sélection
+    await page.locator('button:has-text("Ajouter")').click();
+    const submitBtn = page.locator('button:has-text("Enregistrer")');
+    await expect(submitBtn).toBeDisabled();
+    // Fermer
+    await page.locator('button:has-text("Annuler")').click();
+
+    // Création valide avec compte 2183
     const assetLabel = uniq('Machine E2E');
     await page.locator('button:has-text("Ajouter")').click();
     await page.fill('input[name="label"]', assetLabel);
     await page.fill('input[name="amount_ht"]', '20000');
     await page.fill('input[name="duration_years"]', '10');
     await page.fill('input[name="acquisition_date"]', '2024-04-01');
-    await page.fill('input[name="account_code"]', '215');
-    await page.click('button:has-text("Enregistrer")');
+    const accountSearch = page.locator('input[aria-label="Recherche compte comptable"]');
+    await accountSearch.fill('2183');
+    await page.locator('button:has-text("2183")').first().click();
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
     await expect(page.locator(`td:has-text("${assetLabel}")`)).toBeVisible();
+
+    // Tentative forcer code serveur 706 (manipule champ caché après sélection 2183)
+    await page.locator('button:has-text("Ajouter")').click();
+    await page.fill('input[name="label"]', uniq('Asset Invalide 706'));
+    await page.fill('input[name="amount_ht"]', '1000');
+    await page.fill('input[name="duration_years"]', '5');
+    await page.fill('input[name="acquisition_date"]', '2025-01-15');
+    const accountSearch2 = page.locator('input[aria-label="Recherche compte comptable"]');
+    await accountSearch2.fill('2184');
+    await page.locator('button:has-text("2184")').first().click();
+    // Override hidden value (simulate spoof)
+    await page.evaluate(() => { const el = document.querySelector('input[type="hidden"][name="account_code"]') as HTMLInputElement | null; if (el) el.value = '706'; });
+    const submitSpoof = page.locator('button:has-text("Enregistrer")');
+    await submitSpoof.click();
+    // Erreur attendue (enum invalide -> message contient 706)
+    await expect(page.locator('text=706')).toBeVisible();
+    // Annuler modal
+    await page.locator('button:has-text("Annuler")').click();
+
+    // Accéder amortissement asset valide
     await page.click(`tr:has(td:has-text("${assetLabel}")) a:has-text("Voir")`);
-    await expect(page.locator('h1:has-text("Amortissement - Machine E2E")')).toBeVisible();
+    await expect(page.locator(`h1:has-text("Amortissement - ${assetLabel}")`)).toBeVisible();
     const id = page.url().split('/').slice(-2)[0];
-    // Vérifier dotation 2024 ≈ 1500
-    await expect(page.locator('table')).toBeVisible();
     const row2024 = page.locator('tbody tr:has(td:has-text("2024"))');
     await expect(row2024).toBeVisible();
     const dotationCellText = (await row2024.locator('td').nth(1).innerText()).trim();
-    // Normaliser: retirer espaces fines / insécables, garder chiffres et séparateurs ., ,
-    const normalized = dotationCellText.replace(/[\u202F\u00A0\s]/g,''); // enlever espaces
-    const numeric = parseFloat(normalized.replace('.', '').replace(',', '.')); // enlever éventuel séparateur milliers
+    const normalized = dotationCellText.replace(/[\u202F\u00A0\s]/g,'');
+    const numeric = parseFloat(normalized.replace('.', '').replace(',', '.'));
     expect(numeric).toBeGreaterThan(1499);
     expect(numeric).toBeLessThan(1501);
-    // Export CSV
     const csvDownload = await Promise.all([
       page.waitForEvent('download'),
       page.click('a:has-text("Export CSV")')
@@ -181,8 +218,6 @@ let achatEditedGlobal: string | undefined;
     expect(csvPath).toBeTruthy();
     saveDownloadCopy(csvPath, `amort-${id}-${UNIQUE_RUN_ID}.csv`);
 
-    // Export XLSX
-    createdAssetId = id;
     const xlsxResp = await retry(()=>page.request.get(`/api/assets/${id}/amortization/export?format=xlsx`));
     expect(xlsxResp.ok()).toBeTruthy();
     const xlsxBuf = await xlsxResp.body();

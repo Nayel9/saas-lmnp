@@ -75,7 +75,7 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
           </div>
           <div className="md:col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
             {sp.from && <span>Période: {sp.from} → {sp.to || '…'}</span>}
-            {hasActiveFilter && <span className="px-2 py-0.5 rounded bg-gray-200">Filtre actif</span>}
+            {hasActiveFilter && <span className="badge">Filtre actif</span>}
           </div>
         </form>
         <div className="flex flex-wrap gap-4 text-sm">
@@ -99,7 +99,7 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
           </thead>
           <tbody>
             {entries.map(e => (
-              <tr key={e.id} className="border-b last:border-none hover:bg-gray-50">
+              <tr key={e.id} className="border-b last:border-none hover:bg-bg-muted">
                 <td className="py-1 pr-4 whitespace-nowrap">{formatDateISO(e.date)}</td>
                 <td className="py-1 pr-4">{e.designation}</td>
                 <td className="py-1 pr-4">{e.tier}</td>
@@ -109,14 +109,12 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
                   <EditButton entry={{ id: e.id, date: e.date, designation: e.designation, tier: e.tier, account_code: e.account_code, amount: Number(e.amount) }} />
                   <form action={deleteEntryFormAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={e.id} />
-                    <button className="text-xs text-red-600 hover:underline">Suppr</button>
+                    <button className="text-xs text-[--color-danger] hover:underline">Suppr</button>
                   </form>
                 </td>
               </tr>
             ))}
-            {!entries.length && (
-              <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Aucune écriture</td></tr>
-            )}
+            {!entries.length && <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Aucune écriture</td></tr>}
           </tbody>
         </table>
       </div>

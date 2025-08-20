@@ -54,7 +54,7 @@ export default async function C2033CPage({ searchParams }: { searchParams: Promi
         </div>
         <div className="md:col-span-6 flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
           {from && <span>Période: {from} → {to || '…'}</span>}
-          {hasFilters && <span className="px-2 py-0.5 rounded bg-gray-200">Filtre actif</span>}
+          {hasFilters && <span className="badge">Filtre actif</span>}
         </div>
       </form>
     </section>
@@ -118,8 +118,8 @@ export default async function C2033CPage({ searchParams }: { searchParams: Promi
         <span>Résultat</span>
         <span className="tabular-nums">{data.totals.resultat.toFixed(2)}</span>
       </div>
-      {data.totals.resultat < 0 && <div className="text-xs text-red-600">Résultat négatif</div>}
-      {(data.truncated) && <div className="text-xs text-amber-600">Données tronquées (volume &gt; limite interne)</div>}
+      {data.totals.resultat < 0 && <div className="text-xs text-[--color-danger]">Résultat négatif</div>}
+      {(data.truncated) && <div className="text-xs text-[--color-warning]">Données tronquées (volume &gt; limite interne)</div>}
 
       <div className="text-xs text-muted-foreground flex flex-wrap gap-4">
         <span>Période: {from || '—'} → {to || '—'}</span>

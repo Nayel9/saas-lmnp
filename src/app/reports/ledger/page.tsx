@@ -67,7 +67,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         </div>
         <div className="md:col-span-6 flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
           {from && <span>Période: {from} → {to||'…'}</span>}
-          {hasFilter && <span className="px-2 py-0.5 bg-gray-200 rounded">Filtre actif</span>}
+          {hasFilter && <span className="badge">Filtre actif</span>}
         </div>
       </form>
       <div className="flex gap-2">
@@ -88,7 +88,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
           </tr>
         </thead>
         <tbody>
-          {enriched.map(r => <tr key={r.id} className="border-b last:border-none hover:bg-gray-50">
+          {enriched.map(r => <tr key={r.id} className="border-b last:border-none hover:bg-bg-muted">
             <td className="py-1 pr-4 whitespace-nowrap">{r.date.slice(0,10)}</td>
             <td className="py-1 pr-4">{r.tier}</td>
             <td className="py-1 pr-4 font-medium">{r.designation}</td>
@@ -110,4 +110,3 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     </div>
   </main>;
 }
-

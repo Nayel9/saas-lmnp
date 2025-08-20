@@ -90,3 +90,5 @@
     @apply w-full rounded-[--radius] border border-border bg-bg
     px-3 py-2 outline-none focus-visible:ring-2 ring-[--color-ring];
 }
+@utility text-brand { @apply text-[--color-brand]; }
+@utility badge { @apply inline-flex items-center rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-medium border border-border; }
