@@ -12,10 +12,10 @@ export function NavBar() {
   const router = useRouter();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const hide = pathname === "/login"; // garder la logique d'affichage
+  const minimal = pathname === "/login"; // variante minimale sur /login
 
   useEffect(() => {
-    if (hide) return; // ne pas initialiser sur /login
+    if (minimal) return; // ne pas initialiser supabase pour la page login
     const client = getSupabaseBrowserClient();
     setSupabase(client);
     let active = true;
@@ -24,15 +24,27 @@ export function NavBar() {
       setUser(session?.user ?? null);
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
-  }, [hide]);
+  }, [minimal]);
+
+  if (minimal) {
+    return (
+      <nav className="w-full border-b border-border bg-bg backdrop-blur flex items-center justify-between px-4 h-14" aria-label="Navigation minimale">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="font-semibold text-sm tracking-tight focus-visible:ring-2 ring-[--color-ring] outline-none flex items-center gap-2" aria-label="Accueil" title="Accueil LMNP App">
+            <Image src="/LMNPlus_logo_variant_2.png" alt="LMNP App" width={160} height={60} priority className="rounded-[--radius-sm] object-contain" />
+            <span className="sr-only">LMNP App</span>
+          </Link>
+          <Link href="/" className="px-3 py-2 rounded-md text-sm font-medium transition-colors focus-visible:ring-2 ring-[--color-ring] outline-none hover:bg-bg-muted">Accueil</Link>
+        </div>
+      </nav>
+    );
+  }
 
   const logout = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
     router.replace('/');
   };
-
-  if (hide) return null;
 
   const role = getUserRole(user);
   const linkClass = (target: string) => {
