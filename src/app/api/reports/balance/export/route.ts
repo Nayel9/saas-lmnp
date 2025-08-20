@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateBalancePdf } from '@/lib/balance-pdf';
 
@@ -33,10 +33,10 @@ async function fetchAggregated(userId: string, params: { from?: string|null; to?
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return new Response('Unauthorized', { status: 401 });
-  try { assertAdmin(user); } catch { return new Response('Forbidden', { status: 403 }); }
+  if (getUserRole(user) !== 'admin') return new Response('Forbidden', { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const format = (searchParams.get('format') === 'pdf') ? 'pdf' : 'csv';

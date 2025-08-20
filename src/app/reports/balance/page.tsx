@@ -1,5 +1,5 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import type { BalanceRow } from '@/lib/balance';
 import Link from 'next/link';
@@ -31,10 +31,10 @@ async function fetchAggregated(userId: string, params: { from?: string|null; to?
 
 export default async function BalanceReportPage({ searchParams }: { searchParams: Promise<Record<string,string|string[]|undefined>> }) {
   const sp = await searchParams;
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
-  try { assertAdmin(user); } catch { return <div className="p-8">Accès administrateur requis</div>; }
+  if (getUserRole(user) !== 'admin') return <div className="p-8">Accès administrateur requis</div>;
 
   const from = sp.from as string | undefined; const to = sp.to as string | undefined; const account_code = sp.account_code as string | undefined; const q = sp.q as string | undefined;
   const rows = await fetchAggregated(user.id, { from, to, account_code, q });

@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createProperty } from "./actions";
-import { getUserRole } from "@/lib/auth";
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import Link from "next/link";
+import { createProperty } from "./actions";
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) redirect("/login");
+    const session = await auth();
+    const user = session?.user;
+    if (!user) redirect("/login");
     const role = getUserRole(user);
-
     return (
         <main className="min-h-screen p-8 space-y-8 max-w-5xl mx-auto">
             <header className="flex flex-col gap-2">
@@ -21,7 +20,6 @@ export default async function DashboardPage() {
                     <p className="text-xs text-muted-foreground"><Link href="/admin" className="underline">Accès administration</Link></p>
                 )}
             </header>
-
             <section className="grid gap-6 md:grid-cols-2">
                 <div className="card space-y-4">
                     <h2 className="text-lg font-medium">Nouveau bien</h2>

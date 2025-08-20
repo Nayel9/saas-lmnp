@@ -1,18 +1,16 @@
 "use server";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { auth } from '@/lib/auth/core';
 import { prisma } from "@/lib/prisma";
 
 export async function createProperty(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) {
     redirect("/login");
   }
   const label = (formData.get("label") || "").toString().trim();
-  if (!label) {
-    return; // TODO: gestion d'erreur UI (toast) côté client via pattern pending
-  }
+  if (!label) return;
   const address = formData.get("address")?.toString().trim() || null;
   await prisma.property.create({
     data: { label, address, user_id: user.id },

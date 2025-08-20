@@ -7,8 +7,8 @@ out
 
 # Env
 .env
-.env.*.local
-.env
+.env.local
+.env.test
 
 # Logs
 npm-debug.log*
@@ -23,3 +23,6 @@ prisma/.env
 .DS_Store
 Thumbs.db
 
+# E2E artifacts
+e2e-artifacts/
+test-results/

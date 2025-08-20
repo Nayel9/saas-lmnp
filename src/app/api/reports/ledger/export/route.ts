@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateLedgerPdf } from '@/lib/ledger-pdf';
 import { computeLedger } from '@/lib/ledger';
@@ -35,10 +35,10 @@ async function fetchLedger(userId: string, account_code: string, params: { from?
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return new Response('Unauthorized', { status: 401 });
-  try { assertAdmin(user); } catch { return new Response('Forbidden', { status: 403 }); }
+  if (getUserRole(user) !== 'admin') return new Response('Forbidden', { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const account_code = searchParams.get('account_code');

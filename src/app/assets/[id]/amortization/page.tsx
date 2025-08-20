@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth/core';
 import { computeLinearAmortization } from '@/lib/asset-amortization';
 import { formatAmount } from '@/lib/format';
 import Link from 'next/link';
@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AssetAmortizationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
   const asset = await prisma.asset.findFirst({ where: { id, user_id: user.id } });
   if (!asset) return <div className="p-8">Introuvable</div>;

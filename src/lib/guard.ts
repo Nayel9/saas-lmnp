@@ -1,4 +1,3 @@
-import type { User } from '@supabase/supabase-js';
 import { getUserRole } from './auth';
 
 export type GuardOutcome = 'loading' | 'unauthenticated' | 'forbidden' | 'ok';
@@ -8,10 +7,9 @@ export type GuardOutcome = 'loading' | 'unauthenticated' | 'forbidden' | 'ok';
  * - requiredRole user => seulement vérifier authentification.
  * - requiredRole admin => nécessite authentification + rôle admin.
  */
-export function evaluateAccess(requiredRole: 'user' | 'admin', user: User | null | undefined, loading: boolean): GuardOutcome {
+export function evaluateAccess(requiredRole: 'user' | 'admin', user: { role?: string } | null | undefined, loading: boolean): GuardOutcome {
   if (loading) return 'loading';
   if (!user) return 'unauthenticated';
   if (requiredRole === 'admin' && getUserRole(user) !== 'admin') return 'forbidden';
   return 'ok';
 }
-

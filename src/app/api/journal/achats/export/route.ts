@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth/core';
 import * as XLSX from 'xlsx';
 import type { Prisma } from '@prisma/client';
 import { generateJournalPdf } from '@/lib/journal-pdf';
@@ -25,8 +25,8 @@ function buildWhere(userId: string, params: { from?: string|null; to?: string|nu
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return new Response('Unauthorized', { status: 401 });
   const { searchParams } = new URL(req.url);
   const formatParam = searchParams.get('format');

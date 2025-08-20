@@ -1,5 +1,5 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { assertAdmin } from '@/lib/auth';
+import { auth } from '@/lib/auth/core';
+import { getUserRole } from '@/lib/auth';
 import { compute2033E } from '@/lib/accounting/compute2033e';
 
 export const dynamic = 'force-dynamic';
@@ -9,10 +9,10 @@ export default async function C2033EPage({ searchParams }: { searchParams: Promi
   const yearStr = sp.year as string | undefined;
   const q = sp.q as string | undefined;
   const year = yearStr ? parseInt(yearStr,10) : new Date().getFullYear();
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
-  try { assertAdmin(user); } catch { return <div className="p-8">Accès administrateur requis</div>; }
+  if (getUserRole(user) !== 'admin') return <div className="p-8">Accès administrateur requis</div>;
   const data = await compute2033E({ userId: user.id, year, q });
 
   return <main className="p-6 max-w-6xl mx-auto space-y-6">
