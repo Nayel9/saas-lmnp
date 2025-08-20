@@ -8,7 +8,7 @@ import { getUserRole } from '@/lib/auth';
 export function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const user = session?.user;
   const minimal = pathname === "/login"; // variante minimale sur /login
   const role = getUserRole(user);

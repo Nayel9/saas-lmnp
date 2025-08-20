@@ -17,10 +17,10 @@ if (!email || !password) {
     const hash = await bcrypt.hash(password, 10);
     const existing = await prisma.user.findUnique({ where: { email } });
     if (!existing) {
-      const created = await prisma.user.create({ data: { email, password: hash, role: 'admin', name: 'Admin Seed' } });
+      const created = await prisma.user.create({ data: { email, password: hash, role: 'admin', name: 'Admin Seed', emailVerified: new Date() } });
       console.log('Admin créé:', created.id);
     } else {
-      await prisma.user.update({ where: { id: existing.id }, data: { password: hash, role: 'admin' } });
+      await prisma.user.update({ where: { id: existing.id }, data: { password: hash, role: 'admin', emailVerified: existing.emailVerified || new Date() } });
       console.log('Admin mis à jour:', existing.id);
     }
     process.exit(0);
