@@ -21,6 +21,15 @@ export async function validateCredentials(email: string, password: string): Prom
   return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan };
 }
 
+export async function requireVerifiedCredentials(email: string, password: string): Promise<AppUser | null | 'EMAIL_NOT_VERIFIED'> {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !user.password) return null;
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return null;
+  if (!user.emailVerified) return 'EMAIL_NOT_VERIFIED';
+  return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan };
+}
+
 const adapter: Adapter = PrismaAdapter(prisma);
 
 export const authOptions: NextAuthConfig = {
@@ -35,7 +44,11 @@ export const authOptions: NextAuthConfig = {
         const parsed = credentialsSchema.safeParse(creds);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
-        return await validateCredentials(email, password);
+        const res = await requireVerifiedCredentials(email, password);
+        if (res === 'EMAIL_NOT_VERIFIED') {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
+        return res;
       }
     }),
   ],

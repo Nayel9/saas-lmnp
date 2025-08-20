@@ -16,9 +16,9 @@ async function ensureAdminCreds() {
   const existing = await prisma.user.findUnique({ where: { email } });
   const hash = await bcrypt.hash(password, 10);
   if (!existing) {
-    await prisma.user.create({ data: { email, password: hash, role: 'admin' } });
-  } else if (existing.role !== 'admin' || !existing.password) {
-    await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin', password: hash } });
+    await prisma.user.create({ data: { email, password: hash, role: 'admin', emailVerified: new Date() } });
+  } else if (existing.role !== 'admin' || !existing.password || !existing.emailVerified) {
+    await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin', password: hash, emailVerified: existing.emailVerified || new Date() } });
   }
   return { email: email!, password: password! };
 }
@@ -27,7 +27,7 @@ async function createIsolatedUser(): Promise<{ email: string; password: string }
   const email = `user2-${Date.now()}@local.test`;
   const password = 'Passw0rd!';
   const hash = await bcrypt.hash(password, 10);
-  await prisma.user.create({ data: { email, password: hash, role: 'user' } });
+  await prisma.user.create({ data: { email, password: hash, role: 'user', emailVerified: new Date() } });
   return { email, password };
 }
 

@@ -31,6 +31,29 @@ pnpm admin:ensure  # crée ou met à jour l'utilisateur admin (hash bcrypt)
 ```
 Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 
+### Vérification d'email (Brevo)
+- À l'inscription (`POST /api/users`): création utilisateur avec `emailVerified = null`, génération d'un token aléatoire (32o base64url) stocké hashé (SHA-256) dans `VerificationToken` (champ `token`). Email envoyé via Brevo avec lien `/auth/verify?token=...&email=...`.
+- Tant que l'email n'est pas vérifié, la connexion Credentials échoue avec erreur `EMAIL_NOT_VERIFIED` et l'UI propose un renvoi.
+- Vérification: `GET /auth/verify` (redirection → `/login?verified=1` si succès, sinon `?verified=0`). En succès: set `user.emailVerified = now`, suppression des tokens restants.
+- Renvoi: `POST /api/auth/resend-verification` (toujours 200 réponse générique). Rate-limit: 1 requête / 60s / IP+email (memoire).
+- Sécurité: token jamais stocké en clair (hash SHA-256 en base), expiration 24h, usage unique.
+- Variables d_env requises pour envoi réel: `BREVO_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `NEXT_PUBLIC_SITE_URL`.
+- En dev sans clé Brevo: le lien est loggué en console.
+
+#### Endpoints
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| POST | /api/users | Signup (crée compte + email de vérification) |
+| POST | /api/auth/resend-verification | Renvoi email (réponse générique) |
+| GET | /auth/verify | Consomme token et vérifie l'email |
+
+#### Variables d'environnement (ajouts)
+| Variable | Obligatoire | Rôle |
+|----------|-------------|------|
+| BREVO_API_KEY | prod oui / dev non | Clé API Brevo SMTP v3 |
+| EMAIL_FROM | oui | Adresse expéditeur vérifiée Brevo |
+| EMAIL_FROM_NAME | non | Nom expéditeur (par défaut "LMNP App") |
+
 ## Procédure DB & Migrations
 ### Initialisation
 ```bash

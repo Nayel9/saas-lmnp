@@ -3,7 +3,8 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() })
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams('')
 }));
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ status: 'unauthenticated', data: null })

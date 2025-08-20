@@ -1,52 +1,129 @@
 "use client";
-import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
+import { z } from 'zod';
+import { InputField } from '@/components/forms/input-field';
+import { PasswordField } from '@/components/forms/password-field';
+import { PasswordStrengthMeter } from '@/components/forms/password-strength-meter';
 
 type Mode = 'login' | 'signup';
-interface Message { type: 'success' | 'error'; text: string; }
+
+const loginSchema = z.object({ email: z.string().email('Email invalide'), password: z.string().min(8, 'Min 8 caractères') });
+const signupSchema = loginSchema.extend({ confirmPassword: z.string().min(8, 'Min 8 caractères') })
+  .refine(d => d.password === d.confirmPassword, { path: ['confirmPassword'], message: 'Les mots de passe ne correspondent pas' });
+
+interface FormErrors { email?: string; password?: string; confirmPassword?: string; global?: string; }
 
 export default function LoginPageClient() {
   const router = useRouter();
-  const {status } = useSession();
+  const { status } = useSession();
+  const search = useSearchParams();
+  const verifiedParam = search?.get('verified');
+
   const [mode, setMode] = useState<Mode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
+  const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const [resent, setResent] = useState(false);
+  const [honeyValue, setHoneyValue] = useState('');
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => { if (status === 'authenticated') router.replace('/dashboard'); }, [status, router]);
 
-  const resetMessages = () => setMessage(null);
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    if (id === 'website') { setHoneyValue(value); return; }
+    setFormData(f => ({ ...f, [id]: value }));
+    if (errors[id as keyof FormErrors]) setErrors(prev => ({ ...prev, [id]: undefined }));
+    if (emailNotVerified) setEmailNotVerified(false);
+    setSuccessMessage(null);
+  };
 
   const submit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    resetMessages();
+    setErrors({});
+    setEmailNotVerified(false);
+    setSuccessMessage(null);
+
+    if (honeyValue) { // Honeypot
+      setLoading(true);
+      setTimeout(()=>{ router.push('/'); }, 1200);
+      return;
+    }
+
+    if (mode === 'signup') {
+      const parsed = signupSchema.safeParse(formData);
+      if (!parsed.success) {
+        const fieldErrors = parsed.error.flatten().fieldErrors;
+        setErrors({
+          email: fieldErrors.email?.[0],
+          password: fieldErrors.password?.[0],
+          confirmPassword: fieldErrors.confirmPassword?.[0]
+        });
+        return;
+      }
+      setLoading(true);
+      try {
+        const resp = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email, password: formData.password }) });
+        if (!resp.ok) {
+          if (resp.status === 409) {
+            setErrors({ global: 'Email déjà utilisé' });
+          } else if (resp.status === 400) {
+            setErrors({ global: 'Données invalides' });
+          } else {
+            setErrors({ global: 'Erreur serveur' });
+          }
+          return;
+        }
+        setSuccessMessage('Compte créé. Vérifiez votre email pour activer votre compte.');
+        setFormData(f => ({ ...f, password: '', confirmPassword: '' }));
+      } catch {
+        setErrors({ global: 'Erreur réseau' });
+      } finally { setLoading(false); }
+      return;
+    }
+
+    // mode login
+    const parsed = loginSchema.safeParse(formData);
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      setErrors({ email: fieldErrors.email?.[0], password: fieldErrors.password?.[0] });
+      return;
+    }
     setLoading(true);
     try {
-      if (mode === 'signup') {
-        const resp = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-        if (!resp.ok) {
-          const txt = await resp.text();
-            throw new Error(txt || 'Échec création');
+      const res = await signIn('credentials', { email: formData.email, password: formData.password, redirect: false });
+      if (res?.error) {
+        if (res.error === 'EMAIL_NOT_VERIFIED') {
+          setEmailNotVerified(true);
+          setErrors({ global: 'Votre email n\'est pas vérifié.' });
+        } else {
+          setErrors({ global: 'Identifiants invalides' });
         }
+        return;
       }
-      const res = await signIn('credentials', { email, password, redirect: false });
-      if (res?.error) throw new Error('Identifiants invalides');
-      setMessage({ type: 'success', text: 'Connexion réussie. Redirection…' });
       router.push('/dashboard');
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inattendue';
-      setMessage({ type: 'error', text: errorMsg });
+    } catch {
+      setErrors({ global: 'Erreur serveur' });
     } finally { setLoading(false); }
-  }, [email, password, mode, router]);
+  }, [formData, honeyValue, mode, router]);
 
-  const isEmailValid = /.+@.+\..+/.test(email);
-  const canSubmit = !loading && isEmailValid && password.length >= 8;
+  const resend = async () => {
+    if (resent || !formData.email) return;
+    try {
+      await fetch('/api/auth/resend-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email }) });
+      setResent(true);
+      setErrors({ global: 'Si un compte existe, un email a été envoyé.' });
+    } catch { /* ignore */ }
+  };
 
   if (status === 'loading') {
     return <main className="min-h-screen flex items-center justify-center"><p className="text-sm text-muted-foreground">Chargement…</p></main>;
   }
+
+  const showStrength = mode === 'signup';
 
   return (
     <main id="main" className="min-h-screen flex flex-col items-center px-4 py-10">
@@ -54,46 +131,47 @@ export default function LoginPageClient() {
         <h1 id="auth-title" className="text-xl font-semibold tracking-tight mb-2">Authentification</h1>
         <p className="text-sm text-muted-foreground mb-6">Accédez à votre espace.</p>
         <div className="flex items-center gap-2 mb-6" role="tablist" aria-label="Modes d'authentification">
-          <button role="tab" aria-selected={mode==='login'} className={`btn text-sm px-3 py-1.5 ${mode==='login'? 'bg-bg-muted' : 'btn-ghost'}`} onClick={()=>{ setMode('login'); resetMessages(); }}>
+          <button type="button" role="tab" aria-selected={mode==='login'} className={`btn text-sm px-3 py-1.5 ${mode==='login' ? 'bg-bg-muted' : 'btn-ghost'}`} onClick={()=>{ setMode('login'); setErrors({}); setSuccessMessage(null); }}>
             Se connecter
           </button>
-          <button role="tab" aria-selected={mode==='signup'} className={`btn text-sm px-3 py-1.5 ${mode==='signup'? 'bg-bg-muted' : 'btn-ghost'}`} onClick={()=>{ setMode('signup'); resetMessages(); }}>
+          <button type="button" role="tab" aria-selected={mode==='signup'} className={`btn text-sm px-3 py-1.5 ${mode==='signup' ? 'bg-bg-muted' : 'btn-ghost'}`} onClick={()=>{ setMode('signup'); setErrors({}); setSuccessMessage(null); setEmailNotVerified(false); }}>
             Créer un compte
           </button>
         </div>
-        <form onSubmit={submit} noValidate>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-              <input id="email" name="email" type="email" autoComplete="email" required className="input" placeholder="vous@exemple.fr" value={email} onChange={e=>setEmail(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">Mot de passe</label>
-              <input id="password" name="password" type="password" autoComplete={mode==='login'? 'current-password':'new-password'} required className="input" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} />
-              <p className="mt-1 text-xs text-muted-foreground">8 caractères minimum.</p>
-            </div>
-            <div className="flex flex-col gap-2 pt-2">
-              <button type="submit" disabled={!canSubmit} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed" aria-disabled={!canSubmit}>
-                {loading ? '…' : mode === 'login' ? 'Se connecter' : 'Créer le compte'}
-              </button>
-              <div className="grid grid-cols-2 gap-2 mt-2" aria-label="Boutons SSO">
-                <button type="button" className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt" disabled>Google</button>
-                <button type="button" className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt" disabled>Apple</button>
-              </div>
-            </div>
+        {verifiedParam === '1' && <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700">Email vérifié, vous pouvez maintenant vous connecter.</div>}
+        {verifiedParam === '0' && <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600">Lien invalide ou expiré, renvoyez un email de vérification.</div>}
+        {errors.global && <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600" role="alert">{errors.global}</div>}
+        {successMessage && <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700" role="status">{successMessage}</div>}
+        <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+          <div aria-hidden="true" style={{ position: 'absolute', overflow: 'hidden', height: 0, width: 0, clip: 'rect(0 0 0 0)', clipPath: 'inset(50%)', whiteSpace: 'nowrap' }}>
+            <label htmlFor="website">Ne pas remplir ce champ</label>
+            <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" value={honeyValue} onChange={onChange} />
           </div>
-        </form>
-        <div className="mt-4 min-h-[1.25rem] text-sm" aria-live="polite" role="status">
-          {message && (
-            <p className={message.type === 'error' ? 'text-[--color-danger]' : 'text-brand'}>{message.text}</p>
+          <InputField id="email" label="Email" type="email" value={formData.email} onChange={onChange} disabled={loading} error={errors.email} placeholder="vous@exemple.fr"  autoComplete="email" />
+          <PasswordField id="password" label="Mot de passe" value={formData.password} onChange={onChange} disabled={loading} error={errors.password} placeholder="••••••••"  autoComplete={mode==='login'? 'current-password':'new-password'} />
+          {showStrength && <PasswordStrengthMeter password={formData.password} className="bg-white" />}
+          {mode==='signup' && (
+            <PasswordField id="confirmPassword" label="Confirmer le mot de passe" value={formData.confirmPassword} onChange={onChange} disabled={loading} error={errors.confirmPassword} placeholder="••••••••" autoComplete="new-password" />
           )}
-        </div>
+          <div className="grid grid-cols-2 gap-2 mt-1" aria-label="Boutons SSO">
+            <button type="button" disabled className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt">Google</button>
+            <button type="button" disabled className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt">Apple</button>
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary h-10 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? '…' : (mode==='login' ? 'Se connecter' : 'Créer le compte')}</button>
+          {emailNotVerified && mode==='login' && (
+            <button type="button" onClick={resend} disabled={resent} className="underline text-xs text-muted-foreground disabled:opacity-50 self-start">Renvoyer l&apos;email de vérification</button>
+          )}
+        </form>
+        <div aria-live="polite" className="sr-only" />
         <hr className="my-6 border-border" />
         <div className="text-xs leading-relaxed text-muted-foreground">
           <h2 className="font-semibold mb-1 text-sm">Notes</h2>
           <ul className="list-disc pl-4 space-y-1">
-            <li>Google / Apple seront activés plus tard.</li>
-            <li>Après connexion réussie redirection tableau de bord.</li>
+            <li>Email vérifié requis avant première connexion.</li>
+            <li>Mot de passe: 8+ caractères (force affichée à l&apos;inscription).</li>
+            {/* Correction apostrophe */}
+            <li className="hidden">Mot de passe info fallback</li>
+            <li>Les comptes existants peuvent demander un renvoi de mail si non vérifiés.</li>
           </ul>
         </div>
       </div>

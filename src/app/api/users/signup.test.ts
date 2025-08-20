@@ -1,13 +1,15 @@
 import { describe, it, expect, afterAll, vi } from 'vitest';
 /* Refactor mock sans any */
 vi.mock('@/lib/prisma', () => {
-  interface MockUser { id: string; email: string; password?: string; role?: string }
+  interface MockUser { id: string; email: string; password?: string; role?: string; emailVerified?: Date | null }
+  interface MockVerificationToken { identifier: string; token: string; expires: Date }
   const users: MockUser[] = [];
+  const vTokens: MockVerificationToken[] = [];
   function findUnique({ where: { email } }: { where: { email: string } }): Promise<MockUser | null> {
     return Promise.resolve(users.find(u => u.email === email) || null);
   }
   function create({ data }: { data: Omit<MockUser, 'id'> & { id?: string } }): Promise<MockUser> {
-    const user: MockUser = { id: data.id || `u_${users.length}`, email: data.email, password: data.password, role: data.role };
+    const user: MockUser = { id: data.id || `u_${users.length}`, email: data.email, password: data.password, role: data.role, emailVerified: data.emailVerified ?? null };
     users.push(user);
     return Promise.resolve(user);
   }
@@ -16,7 +18,11 @@ vi.mock('@/lib/prisma', () => {
     for (let i = users.length - 1; i >= 0; i--) if (users[i].email === email) users.splice(i, 1);
     return Promise.resolve({ count: before - users.length });
   }
-  return { prisma: { user: { findUnique, create, deleteMany } } };
+  const verificationToken = {
+    deleteMany: ({ where: { identifier } }: { where: { identifier: string } }) => { const before = vTokens.length; for (let i=vTokens.length-1;i>=0;i--) if (vTokens[i].identifier===identifier) vTokens.splice(i,1); return Promise.resolve({ count: before - vTokens.length }); },
+    create: ({ data }: { data: MockVerificationToken }) => { vTokens.push(data); return Promise.resolve(data); }
+  };
+  return { prisma: { user: { findUnique, create, deleteMany }, verificationToken } };
 });
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
