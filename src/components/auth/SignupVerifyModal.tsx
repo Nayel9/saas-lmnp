@@ -1,15 +1,14 @@
-"use client";
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Modal, Title, Text, Button, Loader, Alert, Group} from '@mantine/core';
-import {useMantineTheme} from '@mantine/core';
+import {Text, Loader, Alert} from '@mantine/core';
 import {notifications} from '@mantine/notifications';
 import {useRouter} from 'next/navigation';
+import { X } from 'lucide-react';
 
 interface SignupVerifyModalProps {
   opened: boolean;
   onClose: () => void;
   email: string;
-  enablePolling?: boolean; // pour désactiver dans certains tests
+  enablePolling?: boolean;
 }
 
 const RESEND_COOLDOWN_MS = 60_000;
@@ -17,9 +16,9 @@ const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_DURATION_MS = 90_000;
 
 export function SignupVerifyModal({opened, onClose, email, enablePolling = true}: SignupVerifyModalProps) {
-  const theme = useMantineTheme();
   const router = useRouter();
   const [cooldownEnd, setCooldownEnd] = useState<number>(0);
+  const [animate, setAnimate] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
   const [resendState, setResendState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
@@ -27,7 +26,6 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
   const pollTimeoutRef = useRef<number | null>(null);
   const pollStartedRef = useRef<number | null>(null);
 
-  // countdown rafraîchi chaque seconde
   useEffect(() => {
     if (!opened) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -60,16 +58,14 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
     }
   }, [email, inCooldown, resendState]);
 
-  // Reset état à l'ouverture
   useEffect(() => {
     if (opened) {
-      setCooldownEnd(0); // pas de cooldown initial
+      setCooldownEnd(0);
       setResendState('idle');
       setMessage(null);
     }
   }, [opened]);
 
-  // Polling vérification
   useEffect(() => {
     if (!opened || !enablePolling) return;
     setPolling(true);
@@ -86,13 +82,13 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
             notifications.show({title: 'Email vérifié', message: 'Email vérifié !', color: 'green'});
             onClose();
             router.push('/login?verified=1');
-            return; // stop
+            return;
           }
         }
       } catch {/* ignore */}
       const elapsed = Date.now() - (pollStartedRef.current || 0);
       if (elapsed >= POLL_MAX_DURATION_MS) {
-        setPolling(false); // stop polling
+        setPolling(false);
         return;
       }
       pollTimeoutRef.current = window.setTimeout(poll, POLL_INTERVAL_MS);
@@ -105,31 +101,64 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
     };
   }, [opened, email, enablePolling, onClose, router]);
 
+  useEffect(() => { if(opened) console.log('[SignupVerifyModal] opened for', email); }, [opened, email]);
+
+  useEffect(() => {
+    if (opened) {
+      requestAnimationFrame(() => setAnimate(true));
+    } else {
+      setAnimate(false);
+    }
+  }, [opened]);
+
+  useEffect(() => {
+    if (!opened) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [opened, onClose]);
+
   return (
-    <Modal opened={opened} onClose={onClose} title="Vérifiez vos emails"
-           centered radius="md" shadow="xl" overlayProps={{opacity: 0.55, blur: 3}} data-testid="signup-verify-modal"
-           aria-labelledby="signup-verify-title" aria-describedby="signup-verify-desc">
-      <div id="signup-verify-desc" style={{display: 'grid', gap: theme.spacing.sm}}>
-        <Text>Nous avons envoyé un lien de confirmation à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.</Text>
-        <Group gap="xs" align="center">
-          <Loader color={theme.primaryColor} size="sm" aria-label="En attente de vérification" />
-          <Text size="xs" c="dimmed">{polling ? 'En attente de la vérification…' : 'Vous pouvez renvoyer un email.'}</Text>
-        </Group>
-        <div>
-          <Button data-testid="resend-btn" onClick={doResend} disabled={inCooldown || resendState==='loading'} size="sm" variant="filled">
-            {resendState === 'loading' ? 'Envoi…' : inCooldown ? `Renvoyer (${secondsLeft}s)` : 'Renvoyer l\'email'}
-          </Button>
+    <>
+      {opened && (
+        <div data-testid="signup-verify-modal" role="dialog" aria-modal="true" aria-labelledby="signup-verify-title" aria-describedby="signup-verify-desc"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+             className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-300 ease-out ${animate ? 'opacity-100' : 'opacity-0'}`}>
+          <div className={`bg-bg rounded-md shadow-xl w-full max-w-md p-6 flex flex-col gap-3 relative transform transition-all duration-300 ease-out will-change-transform will-change-opacity ${animate ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}
+               onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" onClick={onClose} aria-label="Fermer la fenêtre" data-testid="close-btn"
+                    className="absolute h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-bg-muted focus:outline-none focus:ring focus:ring-ring transition"
+                    style={{top: 8, right: 8}}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <h2 id="signup-verify-title" className="text-lg font-semibold pr-8">Vérifiez vos emails</h2>
+            <div id="signup-verify-desc" className="text-sm flex flex-col gap-2">
+              <Text size="sm">Nous avons envoyé un lien de confirmation à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.</Text>
+              <div className="flex items-center gap-2 text-xs">
+                <Loader size="sm" aria-label="En attente de vérification" />
+                <Text size="xs" c="dimmed">{polling ? 'En attente de la vérification…' : 'Vous pouvez renvoyer un email.'}</Text>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-1">
+                <button data-testid="resend-btn" type="button" onClick={doResend} disabled={inCooldown || resendState==='loading'}
+                        className={`btn-primary h-8 px-3 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed ${inCooldown ? 'relative' : ''}`}
+                        aria-disabled={inCooldown || resendState==='loading'}>
+                  {resendState === 'loading' ? 'Envoi…' : inCooldown ? `Renvoyer (${secondsLeft}s)` : "Renvoyer l'email"}
+                </button>
+                <button data-testid="home-btn" type="button" onClick={() => router.push('/')} className="btn-ghost h-8 px-3 text-xs">
+                  Accueil
+                </button>
+              </div>
+              <Text size="xs" c="dimmed">Pas reçu ? Vérifiez les indésirables.</Text>
+              {message && (
+                <Alert color={resendState === 'error' ? 'red' : 'blue'} title={resendState === 'error' ? 'Erreur' : 'Info'} data-testid="resend-alert" radius="sm" mt="xs">
+                  {message}
+                </Alert>
+              )}
+            </div>
+          </div>
         </div>
-        <Text size="xs" c="dimmed">Pas reçu ? Regardez dans le dossier indésirables.</Text>
-        <Button variant="subtle" size="xs" onClick={onClose} aria-label="Modifier l'adresse">Modifier l’adresse</Button>
-        {message && (
-          <Alert color={resendState === 'error' ? 'red' : 'blue'} title={resendState === 'error' ? 'Erreur' : 'Info'}
-                 data-testid="resend-alert" radius="sm">
-            {message}
-          </Alert>
-        )}
-      </div>
-    </Modal>
+      )}
+    </>
   );
 }
 
