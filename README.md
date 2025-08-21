@@ -58,9 +58,10 @@ Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 ### Inscription – champs collectés
 - email (unique)
 - password (min 8 chars)
+- confirmPassword (front uniquement – doit matcher password, validation zod)
 - firstName (requis)
 - lastName (requis)
-- phone (optionnel – format libre contrôlé: chiffres, +, espaces, (), -)
+- phone (requis – validation: chiffres, +, espaces, (), - ; normalisé en E.164 côté backend, échec 400 si non normalisable)
 
 Les champs firstName / lastName sont utilisés pour personnaliser l'email ("Bonjour Prénom,").
 
@@ -150,3 +151,6 @@ pnpm test:e2e
 - Refactor typage tests (remplacement `any` par types explicites)
 - Mocks Prisma mémoire pour tests unitaires lourds sans DB externe
 - E2E consolidés (5 scénarios) couvrant isolation et exports
+- Ajout champs profil (firstName, lastName, phone) + email template personnalisé
+- Normalisation téléphone E.164 + téléphone rendu obligatoire
+- Validation confirmPassword (matching) sur le formulaire signup
