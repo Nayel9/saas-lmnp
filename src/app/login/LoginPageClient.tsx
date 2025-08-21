@@ -10,10 +10,14 @@ import { PasswordStrengthMeter } from '@/components/forms/password-strength-mete
 type Mode = 'login' | 'signup';
 
 const loginSchema = z.object({ email: z.string().email('Email invalide'), password: z.string().min(8, 'Min 8 caractères') });
-const signupSchema = loginSchema.extend({ confirmPassword: z.string().min(8, 'Min 8 caractères') })
-  .refine(d => d.password === d.confirmPassword, { path: ['confirmPassword'], message: 'Les mots de passe ne correspondent pas' });
+const signupSchema = loginSchema.extend({
+  confirmPassword: z.string().min(8, 'Min 8 caractères'),
+  firstName: z.string().min(1,'Requis').max(50),
+  lastName: z.string().min(1,'Requis').max(60),
+  phone: z.string().trim().max(30).regex(/^[+0-9 ()-]*$/,'Format invalide').optional().or(z.literal(''))
+}).refine(d => d.password === d.confirmPassword, { path: ['confirmPassword'], message: 'Les mots de passe ne correspondent pas' });
 
-interface FormErrors { email?: string; password?: string; confirmPassword?: string; global?: string; }
+interface FormErrors { email?: string; password?: string; confirmPassword?: string; firstName?: string; lastName?: string; phone?: string; global?: string; }
 
 export default function LoginPageClient() {
   const router = useRouter();
@@ -22,7 +26,7 @@ export default function LoginPageClient() {
   const verifiedParam = search?.get('verified');
 
   const [mode, setMode] = useState<Mode>('login');
-  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '', phone: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [resent, setResent] = useState(false);
@@ -60,13 +64,16 @@ export default function LoginPageClient() {
         setErrors({
           email: fieldErrors.email?.[0],
           password: fieldErrors.password?.[0],
-          confirmPassword: fieldErrors.confirmPassword?.[0]
+          confirmPassword: fieldErrors.confirmPassword?.[0],
+          firstName: fieldErrors.firstName?.[0],
+          lastName: fieldErrors.lastName?.[0],
+          phone: fieldErrors.phone?.[0]
         });
         return;
       }
       setLoading(true);
       try {
-        const resp = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email, password: formData.password }) });
+        const resp = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email, password: formData.password, firstName: formData.firstName, lastName: formData.lastName, phone: formData.phone }) });
         if (!resp.ok) {
           if (resp.status === 409) {
             setErrors({ global: 'Email déjà utilisé' });
@@ -151,8 +158,13 @@ export default function LoginPageClient() {
           <PasswordField id="password" label="Mot de passe" value={formData.password} onChange={onChange} disabled={loading} error={errors.password} placeholder="••••••••"  autoComplete={mode==='login'? 'current-password':'new-password'} />
           {showStrength && <PasswordStrengthMeter password={formData.password} className="bg-white" />}
           {mode==='signup' && (
-            <PasswordField id="confirmPassword" label="Confirmer le mot de passe" value={formData.confirmPassword} onChange={onChange} disabled={loading} error={errors.confirmPassword} placeholder="••••••••" autoComplete="new-password" />
+            <>
+              <InputField id="firstName" label="Prénom" value={formData.firstName} onChange={onChange} disabled={loading} error={errors.firstName} placeholder="Votre prénom" variant="contrast" autoComplete="given-name" />
+              <InputField id="lastName" label="Nom" value={formData.lastName} onChange={onChange} disabled={loading} error={errors.lastName} placeholder="Votre nom" variant="contrast" autoComplete="family-name" />
+              <InputField id="phone" label="Téléphone" value={formData.phone} onChange={onChange} disabled={loading} error={errors.phone} placeholder="+33 ..." variant="contrast" autoComplete="tel" />
+            </>
           )}
+          {mode==='signup' && <PasswordField id="confirmPassword" label="Confirmer le mot de passe" value={formData.confirmPassword} onChange={onChange} disabled={loading} error={errors.confirmPassword} placeholder="••••••••" autoComplete="new-password" />}
           <div className="grid grid-cols-2 gap-2 mt-1" aria-label="Boutons SSO">
             <button type="button" disabled className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt">Google</button>
             <button type="button" disabled className="btn bg-bg-muted text-muted-foreground cursor-not-allowed" aria-disabled="true" title="Bientôt">Apple</button>

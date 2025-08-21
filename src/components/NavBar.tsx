@@ -56,7 +56,9 @@ export function NavBar() {
       <div className="flex items-center gap-3 text-sm">
         {user ? (
           <>
-            <span className="text-muted-foreground hidden sm:inline">{user.email}{role === 'admin' ? ' (admin)' : ''}</span>
+            <span className="text-muted-foreground hidden sm:inline">
+              {user.firstName ? user.firstName + (user.lastName ? ' ' + user.lastName : '') : user.email}{role === 'admin' ? ' (admin)' : ''}
+            </span>
             <button onClick={logout} className="btn-ghost px-3 py-1.5 text-xs" aria-label="Se déconnecter">Déconnexion</button>
           </>
         ) : (
