@@ -1,11 +1,11 @@
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Credentials from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
 import type { NextAuthConfig } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { Adapter } from 'next-auth/adapters';
-import type { JWT } from 'next-auth/jwt';
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -33,8 +33,6 @@ export async function requireVerifiedCredentials(email: string, password: string
 
 const adapter: Adapter = PrismaAdapter(prisma);
 
-interface ExtendedJWT extends JWT { userId?: string; role?: string; plan?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; }
-
 export const authOptions: NextAuthConfig = {
   adapter,
   session: { strategy: 'jwt' },
@@ -54,32 +52,41 @@ export const authOptions: NextAuthConfig = {
         return res;
       }
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google') {
+        await prisma.user.update({
+          where: { email: user.email ?? '' },
+          data: { emailVerified: new Date() },
+        });
+      }
+      return true;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.userId ?? '';
+        session.user.role = token.role;
+        session.user.plan = token.plan;
+        session.user.firstName = token.firstName ?? null;
+        session.user.lastName = token.lastName ?? null;
+      }
+      return session;
+    },
     async jwt({ token, user }) {
       if (user) {
-        const u = user as AppUser; // user retourné par authorize
-        token.userId = u.id;
-        token.role = u.role || 'user';
-        token.plan = u.plan || null;
-        token.firstName = u.firstName || null;
-        token.lastName = u.lastName || null;
-        token.phone = u.phone || null;
+        token.userId = user.id;
+        token.role = user.role;
+        token.plan = user.plan;
+        token.firstName = user.firstName ?? null;
+        token.lastName = user.lastName ?? null;
       }
       return token;
     },
-    async session({ session, token }) {
-      const t = token as ExtendedJWT;
-      if (session.user && t.userId) {
-        session.user.id = t.userId;
-        if (t.role) session.user.role = t.role;
-        if (t.plan !== undefined) session.user.plan = t.plan ?? null;
-        if (t.firstName !== undefined) session.user.firstName = t.firstName ?? null;
-        if (t.lastName !== undefined) session.user.lastName = t.lastName ?? null;
-        if (t.phone !== undefined) session.user.phone = t.phone ?? null;
-      }
-      return session;
-    }
   },
   pages: { signIn: '/login' },
   trustHost: true,
