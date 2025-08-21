@@ -11,6 +11,10 @@ export default async function AdminPage() {
   const role = getUserRole(user);
   if (role !== 'admin') redirect('/dashboard');
 
+  const displayName = user?.firstName && user?.lastName
+          ? `${user.firstName} ${user.lastName}`
+          : user?.email;
+
   return (
     <main className="min-h-screen p-8 max-w-5xl mx-auto space-y-8">
       <header className="flex flex-col gap-2">
@@ -19,7 +23,7 @@ export default async function AdminPage() {
       </header>
       <section className="card space-y-4">
         <h2 className="text-lg font-medium">Statut</h2>
-        <p className="text-sm text-muted-foreground">Compte connecté: <span className="font-medium">{user.email}</span> (role: {role}).</p>
+        <p className="text-sm text-muted-foreground">Compte connecté: <span className="font-medium">{displayName}</span></p>
         <p className="text-sm text-muted-foreground">Ici: futur panneau de gestion (utilisateurs, données, exports).</p>
       </section>
     </main>

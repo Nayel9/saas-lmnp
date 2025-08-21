@@ -11,11 +11,16 @@ export default async function DashboardPage() {
     const user = session?.user;
     if (!user) redirect("/login");
     const role = getUserRole(user);
+
+    const displayName = user?.firstName && user?.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user?.email;
+
     return (
         <main className="min-h-screen p-8 space-y-8 max-w-5xl mx-auto">
             <header className="flex flex-col gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
-                <p className="text-muted-foreground text-sm">Connecté en tant que <span className="font-medium">{user.email}</span> ({role})</p>
+                <p className="text-muted-foreground text-sm">Connecté en tant que <span className="font-medium">{displayName}</span></p>
                 {role === 'admin' && (
                     <p className="text-xs text-muted-foreground"><Link href="/admin" className="underline">Accès administration</Link></p>
                 )}

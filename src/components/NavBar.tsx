@@ -37,11 +37,15 @@ export function NavBar() {
     return `px-3 py-2 rounded-md text-sm font-medium transition-colors focus-visible:ring-2 ring-[--color-ring] outline-none ${active ? 'bg-bg-muted text-brand' : 'hover:bg-bg-muted'}`;
   };
 
+  const displayName = user?.firstName && user?.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user?.email;
+
   return (
     <nav className="w-full border-b border-border bg-bg backdrop-blur flex items-center justify-between px-4 h-14" aria-label="Navigation principale">
       <div className="flex items-center gap-3">
-        <Link href="/" className="font-semibold text-sm tracking-tight focus-visible:ring-2 ring-[--color-ring] outline-none flex items-center gap-2" aria-label="Accueil" title="Accueil LMNP App" aria-current={pathname==='/'? 'page':undefined}>
-          <Image src="/LMNPlus_logo_variant_2.png" alt="LMNP App" width={200} height={100} priority className="rounded-[--radius-sm] object-contain" />
+        <Link href="/" className="font-semibold text-sm tracking-tight focus-visible:ring-2 ring-[--color-ring] outline-none flex items-center gap-2" aria-label="Accueil" title="Accueil LMNP App">
+          <Image src="/LMNPlus_logo_variant_2.png" alt="LMNP App" width={160} height={60} priority className="rounded-[--radius-sm] object-contain" />
           <span className="sr-only">LMNP App</span>
         </Link>
         <div className="flex items-center gap-1 ml-2">
@@ -53,18 +57,12 @@ export function NavBar() {
           {user && role === 'admin' && <Link href="/reports/balance" aria-current={pathname==='/reports/balance'? 'page':undefined} className={linkClass('/reports/balance')}>Balance</Link>}
         </div>
       </div>
-      <div className="flex items-center gap-3 text-sm">
-        {user ? (
-          <>
-            <span className="text-muted-foreground hidden sm:inline">
-              {user.firstName ? user.firstName + (user.lastName ? ' ' + user.lastName : '') : user.email}{role === 'admin' ? ' (admin)' : ''}
-            </span>
-            <button onClick={logout} className="btn-ghost px-3 py-1.5 text-xs" aria-label="Se déconnecter">Déconnexion</button>
-          </>
-        ) : (
-          <Link href="/login" className="btn-primary px-3 py-1.5 text-xs" aria-label="Aller à la page de connexion">Connexion</Link>
-        )}
-      </div>
+      {user && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium">{displayName}</span>
+          <button onClick={logout} className="btn-ghost px-3 py-1.5 text-xs" aria-label="Se déconnecter">Déconnexion</button>
+        </div>
+      )}
     </nav>
   );
 }
