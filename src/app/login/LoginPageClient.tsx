@@ -280,7 +280,7 @@ export default function LoginPageClient() {
                                        checked={acceptTerms}
                                        onChange={(e) => { setAcceptTerms(e.target.checked); if (errors.terms) setErrors(prev => ({...prev, terms: undefined})); }} />
                                 <label htmlFor="acceptTerms" className="cursor-pointer select-none leading-relaxed">
-                                    J'accepte les <a href="/cgv" className="underline" target="_blank" rel="noopener noreferrer">CGV</a> et la <a href="/politique-confidentialite" className="underline" target="_blank" rel="noopener noreferrer">Politique de confidentialité</a>. <span className="text-red-600">(Obligatoire)</span>
+                                    J`&#39;accepte les <a href="/cgv" className="underline" target="_blank" rel="noopener noreferrer">CGV</a> et la <a href="/politique-confidentialite" className="underline" target="_blank" rel="noopener noreferrer">Politique de confidentialité</a>. <span className="text-red-600">(Obligatoire)</span>
                                 </label>
                             </div>
                             {errors.terms && <p className="text-red-600 text-[11px] mt-1" role="alert">{errors.terms}</p>}

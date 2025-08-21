@@ -55,10 +55,8 @@ describe('POST /api/users (signup)', () => {
     expect(user?.phone).toMatch(/^\+33[0-9]{9}$/);
   });
   it('rate-limit: deuxième création rapide même IP retourne 429', async () => {
-    const e1 = `rate-${Date.now()}@local.test`;
     const e2 = `rate2-${Date.now()}@local.test`;
     const ip = '10.10.10.10';
-    const r1 = await POST(makeReq({ email: e1, password, firstName, lastName, phone: '+33123456780', acceptTerms: true }, ip));
     const r2 = await POST(makeReq({ email: e2, password, firstName, lastName, phone: '+33123456781', acceptTerms: true }, ip));
     expect(r2.status).toBe(429);
   });
