@@ -41,6 +41,7 @@
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.2.1",
     "esbuild": "^0.25.9",
+    "libphonenumber-js": "^1.12.13",
     "lucide-react": "^0.470.0",
     "next": "15.4.6",
     "next-auth": "5.0.0-beta.29",

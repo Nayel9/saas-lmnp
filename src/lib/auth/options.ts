@@ -5,20 +5,21 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { Adapter } from 'next-auth/adapters';
+import type { JWT } from 'next-auth/jwt';
 
 const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 
-export interface AppUser { id: string; email: string; name?: string | null; role?: string; plan?: string | null; }
+export interface AppUser { id: string; email: string; name?: string | null; role?: string; plan?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; }
 
 export async function validateCredentials(email: string, password: string): Promise<AppUser | null> {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.password) return null;
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return null;
-  return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan, firstName: user.firstName, lastName: user.lastName, phone: user.phone };
 }
 
 export async function requireVerifiedCredentials(email: string, password: string): Promise<AppUser | null | 'EMAIL_NOT_VERIFIED'> {
@@ -27,10 +28,12 @@ export async function requireVerifiedCredentials(email: string, password: string
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return null;
   if (!user.emailVerified) return 'EMAIL_NOT_VERIFIED';
-  return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, plan: user.plan, firstName: user.firstName, lastName: user.lastName, phone: user.phone };
 }
 
 const adapter: Adapter = PrismaAdapter(prisma);
+
+interface ExtendedJWT extends JWT { userId?: string; role?: string; plan?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; }
 
 export const authOptions: NextAuthConfig = {
   adapter,
@@ -59,14 +62,21 @@ export const authOptions: NextAuthConfig = {
         token.userId = u.id;
         token.role = u.role || 'user';
         token.plan = u.plan || null;
+        token.firstName = u.firstName || null;
+        token.lastName = u.lastName || null;
+        token.phone = u.phone || null;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.userId) {
-        session.user.id = token.userId;
-        if (token.role) session.user.role = token.role;
-        if (token.plan !== undefined) session.user.plan = token.plan as string | null;
+      const t = token as ExtendedJWT;
+      if (session.user && t.userId) {
+        session.user.id = t.userId;
+        if (t.role) session.user.role = t.role;
+        if (t.plan !== undefined) session.user.plan = t.plan ?? null;
+        if (t.firstName !== undefined) session.user.firstName = t.firstName ?? null;
+        if (t.lastName !== undefined) session.user.lastName = t.lastName ?? null;
+        if (t.phone !== undefined) session.user.phone = t.phone ?? null;
       }
       return session;
     }

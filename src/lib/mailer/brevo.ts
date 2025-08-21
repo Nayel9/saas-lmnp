@@ -1,13 +1,16 @@
 import crypto from 'crypto';
+import { renderVerificationEmail } from './templates';
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 export interface SendVerificationEmailParams {
   email: string;
   verifyUrl: string;
+  firstName?: string | null;
+  lastName?: string | null;
 }
 
-export async function sendVerificationEmail({ email, verifyUrl }: SendVerificationEmailParams): Promise<void> {
+export async function sendVerificationEmail({ email, verifyUrl, firstName, lastName }: SendVerificationEmailParams): Promise<void> {
   const apiKey = process.env.BREVO_API_KEY;
   const fromEmail = process.env.EMAIL_FROM;
   const fromName = process.env.EMAIL_FROM_NAME || 'LMNP App';
@@ -17,11 +20,19 @@ export async function sendVerificationEmail({ email, verifyUrl }: SendVerificati
     console.log('[verify-url]', verifyUrl);
     return;
   }
+  const brand = fromName;
+  const site = process.env.NEXT_PUBLIC_SITE_URL || '';
+  const logoFromEnv = process.env.EMAIL_LOGO_URL;
+  const logoUrl = logoFromEnv || (site ? site.replace(/\/$/, '') + '/LMNPlus_logo_variant_2.png' : null);
+  const greetingName = (firstName || lastName || '').trim();
+  const greetingLine = greetingName ? `Bonjour ${greetingName},` : 'Bonjour,';
+  const { subject, html, text } = renderVerificationEmail({ brand, logoUrl, verifyUrl, greetingLine });
   const payload = {
     sender: { email: fromEmail, name: fromName },
     to: [{ email }],
-    subject: 'Vérifiez votre email',
-    htmlContent: `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222;line-height:1.5">\n    <h1 style=\"font-size:16px;margin:0 0 12px\">Bienvenue !</h1>\n    <p style=\"margin:0 0 12px\">Merci de votre inscription. Veuillez confirmer votre adresse email pour activer votre compte.</p>\n    <p style=\"margin:0 0 16px\"><a href=\"${verifyUrl}\" style=\"display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 16px;border-radius:4px;font-weight:600\">Activer mon compte</a></p>\n    <p style=\"margin:0 0 12px\">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur:<br><span style=\"word-break:break-all\">${verifyUrl}</span></p>\n    <p style=\"margin:24px 0 0;font-size:12px;color:#666\">Ce lien expire dans 24h.</p>\n  </div>`,
+    subject,
+    htmlContent: html,
+    textContent: text,
     tags: ['email_verification'],
   };
   if (debug) {

@@ -53,6 +53,16 @@ Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 | BREVO_API_KEY | prod oui / dev non | Clé API Brevo SMTP v3 |
 | EMAIL_FROM | oui | Adresse expéditeur vérifiée Brevo |
 | EMAIL_FROM_NAME | non | Nom expéditeur (par défaut "LMNP App") |
+| EMAIL_LOGO_URL | non | URL absolue du logo utilisé dans l'entête email (fallback: NEXT_PUBLIC_SITE_URL + /LMNPlus_logo_variant_2.png) |
+
+### Inscription – champs collectés
+- email (unique)
+- password (min 8 chars)
+- firstName (requis)
+- lastName (requis)
+- phone (optionnel – format libre contrôlé: chiffres, +, espaces, (), -)
+
+Les champs firstName / lastName sont utilisés pour personnaliser l'email ("Bonjour Prénom,").
 
 ## Procédure DB & Migrations
 ### Initialisation
