@@ -56,12 +56,16 @@ export default function LoginPageClient() {
     const [emailNotVerified, setEmailNotVerified] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
-        if (status === 'authenticated') router.replace('/dashboard');
-    }, [status, router]);
+        if (status === 'authenticated' && !showVerifyModal) router.replace('/dashboard');
+    }, [status, router, showVerifyModal]);
+
+    useEffect(() => {
+        if (search?.get('forceVerify') === '1') {
+            setShowVerifyModal(true);
+        }
+    }, [search]);
 
     const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const {id, value} = e.target;
@@ -126,7 +130,7 @@ export default function LoginPageClient() {
                     }
                     return;
                 }
-                // Ouverture de la modale de vérification
+                console.log('[signup] création OK -> ouverture modale vérification');
                 setShowVerifyModal(true);
                 setFormData(f => ({...f, password: '', confirmPassword: ''}));
             } catch {
@@ -188,7 +192,6 @@ export default function LoginPageClient() {
     }
 
     const showStrength = mode === 'signup';
-    const isClient = typeof window !== 'undefined';
 
     return (
         <main id="main" className="min-h-screen flex flex-col items-center px-4 py-10">
@@ -298,7 +301,7 @@ export default function LoginPageClient() {
                     </ul>
                 </div>
             </div>
-            {isClient && mounted && <SignupVerifyModal opened={showVerifyModal} onClose={() => setShowVerifyModal(false)} email={formData.email} />}
+            <SignupVerifyModal opened={showVerifyModal} enablePolling={true} onClose={() => { console.log('[SignupVerifyModal] manual close'); setShowVerifyModal(false); }} email={formData.email} />
         </main>
     );
 }
