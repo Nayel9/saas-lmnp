@@ -40,6 +40,33 @@ Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 - Variables d_env requises pour envoi réel: `BREVO_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `NEXT_PUBLIC_SITE_URL`.
 - En dev sans clé Brevo: le lien est loggué en console.
 
+#### UX post-inscription (Modale Mantine)
+Après création de compte (POST /api/users 201), une modale "Vérifiez vos emails" (Mantine Modal) s'ouvre au-dessus du formulaire :
+- Affiche l'email cible et un loader.
+- CTA "Renvoyer l'email" avec cooldown 60s (texte devient `Renvoyer (Xs)`).
+- Lien "Modifier l’adresse" qui ferme la modale (retour au formulaire pour corriger l'email avant nouvelle tentative).
+- Message générique de renvoi (jamais d'indication d'existence).
+- Polling léger (5s) vers `/api/auth/check-verified?email=...` pendant 90s max : fermeture automatique + toast si vérifié, redirection `?verified=1`.
+- Accessibilité: focus capturé par la modale, role=dialog, titre/description liés.
+
+Paramètres (constants dans `SignupVerifyModal.tsx`):
+- RESEND_COOLDOWN_MS = 60000
+- POLL_INTERVAL_MS = 5000
+- POLL_MAX_DURATION_MS = 90000
+
+Endpoints additionnels:
+| Méthode | Endpoint | Rôle |
+|---------|----------|------|
+| GET | /api/auth/check-verified?email=... | Polling statut `{"verified": boolean}` |
+
+Tests:
+- Unitaires: `SignupVerifyModal.test.tsx` (render + resend + cooldown)
+- E2E: `signup-flow.spec.ts` attend la modale post-inscription puis flux de vérification.
+
+Accessibilité / a11y:
+- Modal Mantine fournit `role="dialog"` + aria-label via titre.
+- Focus initial dans la modale; fermeture restaure interaction sur le formulaire.
+
 #### Endpoints
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
@@ -58,9 +85,10 @@ Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 ### Inscription – champs collectés
 - email (unique)
 - password (min 8 chars)
+- confirmPassword (front uniquement – doit matcher password, validation zod)
 - firstName (requis)
 - lastName (requis)
-- phone (optionnel – format libre contrôlé: chiffres, +, espaces, (), -)
+- phone (requis – validation: chiffres, +, espaces, (), - ; normalisé en E.164 côté backend, échec 400 si non normalisable)
 
 Les champs firstName / lastName sont utilisés pour personnaliser l'email ("Bonjour Prénom,").
 
@@ -150,3 +178,6 @@ pnpm test:e2e
 - Refactor typage tests (remplacement `any` par types explicites)
 - Mocks Prisma mémoire pour tests unitaires lourds sans DB externe
 - E2E consolidés (5 scénarios) couvrant isolation et exports
+- Ajout champs profil (firstName, lastName, phone) + email template personnalisé
+- Normalisation téléphone E.164 + téléphone rendu obligatoire
+- Validation confirmPassword (matching) sur le formulaire signup

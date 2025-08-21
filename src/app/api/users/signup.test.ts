@@ -58,9 +58,9 @@ describe('POST /api/users (signup)', () => {
     const e1 = `rate-${Date.now()}@local.test`;
     const e2 = `rate2-${Date.now()}@local.test`;
     const ip = '10.10.10.10';
-    const r1 = await POST(makeReq({ email: e1, password, firstName, lastName }, ip));
+    const r1 = await POST(makeReq({ email: e1, password, firstName, lastName, phone: '+33123456780' }, ip));
     expect(r1.status).toBe(201);
-    const r2 = await POST(makeReq({ email: e2, password, firstName, lastName }, ip));
+    const r2 = await POST(makeReq({ email: e2, password, firstName, lastName, phone: '+33123456781' }, ip));
     expect(r2.status).toBe(429);
   });
 });
