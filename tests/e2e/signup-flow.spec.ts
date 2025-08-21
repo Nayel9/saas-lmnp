@@ -18,6 +18,7 @@ test('Flux inscription / vérification / login avec affichage prénom', async ({
   await page.fill('#firstName', firstName);
   await page.fill('#lastName', lastName);
   await page.fill('#phone', phone);
+  await page.check('#acceptTerms');
   await page.click('button[type="submit"]');
 
   // Nouvelle UX: modale de vérification apparaît

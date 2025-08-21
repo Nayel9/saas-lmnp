@@ -104,21 +104,22 @@ model Asset {
 
 /// ================= NextAuth Models =================
 model User {
-  id            String    @id @default(uuid())
-  name          String?
-  firstName     String? // nouvel attribut
-  lastName      String? // nouvel attribut
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String? // hash bcrypt
-  role          String    @default("user")
-  plan          String? // optionnel (ex: free, pro)
-  phone         String? // téléphone
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  name            String?
+  firstName       String? // nouvel attribut
+  lastName        String? // nouvel attribut
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String? // hash bcrypt
+  role            String    @default("user")
+  plan            String? // optionnel (ex: free, pro)
+  phone           String? // téléphone
+  accounts        Account[]
+  sessions        Session[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  termsAcceptedAt DateTime? // timestamp acceptation CGV
 }
 
 model Account {
