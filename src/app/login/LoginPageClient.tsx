@@ -32,6 +32,7 @@ interface FormErrors {
     lastName?: string;
     phone?: string;
     global?: string;
+    terms?: string; // ajout
 }
 
 export default function LoginPageClient() {
@@ -56,6 +57,7 @@ export default function LoginPageClient() {
     const [emailNotVerified, setEmailNotVerified] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
+    const [acceptTerms, setAcceptTerms] = useState(false); // ajout état
 
     useEffect(() => {
         if (status === 'authenticated' && !showVerifyModal) router.replace('/dashboard');
@@ -107,6 +109,10 @@ export default function LoginPageClient() {
                 });
                 return;
             }
+            if (!acceptTerms) {
+                setErrors({terms: 'Vous devez accepter les conditions pour créer un compte.'});
+                return;
+            }
             setLoading(true);
             try {
                 const resp = await fetch('/api/users', {
@@ -117,7 +123,8 @@ export default function LoginPageClient() {
                         password: formData.password,
                         firstName: formData.firstName,
                         lastName: formData.lastName,
-                        phone: formData.phone
+                        phone: formData.phone,
+                        acceptTerms: true
                     })
                 });
                 if (!resp.ok) {
@@ -170,7 +177,7 @@ export default function LoginPageClient() {
         } finally {
             setLoading(false);
         }
-    }, [formData, honeyValue, mode, router]);
+    }, [formData, honeyValue, mode, router, acceptTerms]);
 
     const resend = async () => {
         if (resent || !formData.email) return;
@@ -268,6 +275,15 @@ export default function LoginPageClient() {
                             <InputField id="phone" label="Téléphone" value={formData.phone} onChange={onChange}
                                         disabled={loading} error={errors.phone} placeholder="+33 ..."
                                         autoComplete="tel"/>
+                            <div className="flex items-start gap-2 text-xs mt-2">
+                                <input id="acceptTerms" type="checkbox" className="mt-0.5 cursor-pointer"
+                                       checked={acceptTerms}
+                                       onChange={(e) => { setAcceptTerms(e.target.checked); if (errors.terms) setErrors(prev => ({...prev, terms: undefined})); }} />
+                                <label htmlFor="acceptTerms" className="cursor-pointer select-none leading-relaxed">
+                                    J`&#39;accepte les <a href="/cgv" className="underline" target="_blank" rel="noopener noreferrer">CGV</a> et la <a href="/politique-confidentialite" className="underline" target="_blank" rel="noopener noreferrer">Politique de confidentialité</a>. <span className="text-red-600">(Obligatoire)</span>
+                                </label>
+                            </div>
+                            {errors.terms && <p className="text-red-600 text-[11px] mt-1" role="alert">{errors.terms}</p>}
                         </>
                     )}
                     <div className="grid grid-cols-2 gap-2 mt-1" aria-label="Boutons SSO">
@@ -280,8 +296,8 @@ export default function LoginPageClient() {
                                 aria-disabled="true" title="Bientôt">Apple
                         </button>
                     </div>
-                    <button type="submit" disabled={loading}
-                            className="btn-primary h-10 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? '…' : (mode === 'login' ? 'Se connecter' : 'Créer le compte')}</button>
+                    <button type="submit" disabled={loading || (mode==='signup' && !acceptTerms)}
+                            className="btn-primary h-10 disabled:opacity-50 disabled:cursor-not-allowed" aria-disabled={loading || (mode==='signup' && !acceptTerms)}>{loading ? '…' : (mode === 'login' ? 'Se connecter' : 'Créer le compte')}</button>
                     {emailNotVerified && mode === 'login' && (
                         <button type="button" onClick={resend} disabled={resent}
                                 className="underline text-xs text-muted-foreground disabled:opacity-50 self-start">Renvoyer
