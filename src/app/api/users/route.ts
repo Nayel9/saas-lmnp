@@ -13,7 +13,7 @@ const schema = z.object({
     password: z.string().min(8),
     firstName: z.string().min(1).max(50),
     lastName: z.string().min(1).max(60),
-    phone: z.string().trim().max(30).regex(/^[+0-9 ()-]*$/, {message: 'Format téléphone invalide'}).optional().or(z.literal(''))
+    phone: z.string().trim().min(5).max(30).regex(/^[+0-9 ()-]*$/, {message: 'Format téléphone invalide'})
 }).transform(d => ({...d, phone: d.phone ? d.phone : null}));
 
 // Rate limit simple en mémoire: 1 création / 30s / IP
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         const {email, password, firstName, lastName} = parsed.data;
         let {phone} = parsed.data;
         phone = normalizePhone(phone);
+        if(!phone) return new Response('Validation', {status: 400});
         const existing = await prisma.user.findUnique({where: {email}});
         if (existing) return new Response('Existe déjà', {status: 409});
         const hash = await bcrypt.hash(password, 10);

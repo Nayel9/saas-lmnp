@@ -19,7 +19,10 @@ test('Flux inscription / vérification / login avec affichage prénom', async ({
   await page.fill('#lastName', lastName);
   await page.fill('#phone', phone);
   await page.click('button[type="submit"]');
-  await expect(page.locator('text=Compte créé. Vérifiez votre email')).toBeVisible();
+
+  // Nouvelle UX: modale de vérification apparaît
+  await expect(page.getByRole('dialog', { name: /Vérifiez vos emails/i })).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
 
   // Récupération du token de vérification via endpoint debug
   const debugResp = await request.get(`/api/auth/debug/verification-token?email=${encodeURIComponent(email)}`);
