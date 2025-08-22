@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterAll, vi, beforeEach } from 'vitest';
 vi.mock('@/lib/prisma', () => {
   interface MockUser { id: string; email: string; password?: string; role?: string; emailVerified?: Date | null; firstName?: string | null; lastName?: string | null; phone?: string | null; termsAcceptedAt?: Date | null }
   interface MockVerificationToken { identifier: string; token: string; expires: Date }
@@ -13,6 +13,7 @@ vi.mock('@/lib/prisma', () => {
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { POST } from './route';
+import { getSignupRateLimiter } from '@/lib/signupRateLimit';
 import { NextRequest } from 'next/server';
 
 function makeReq(body: unknown, ip = '127.0.0.1') { return new NextRequest('http://localhost/api/users', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip } }); }
@@ -23,7 +24,14 @@ const firstName = 'Jean';
 const lastName = 'Dupont';
 const phone = '+33123456789';
 
+// Utilise la fonction pour accéder à signupRL
+const signupRL = getSignupRateLimiter();
+
 describe('POST /api/users (signup)', () => {
+  beforeEach(() => {
+    signupRL.clear(); // Réinitialise la Map de limitation de débit avant chaque test
+  });
+
   afterAll(async () => { await prisma.user.deleteMany({ where: { email } }); });
   it('crée un utilisateur avec hash bcrypt', async () => {
     const res = await POST(makeReq({ email, password, firstName, lastName, phone, acceptTerms: true }));
@@ -55,9 +63,13 @@ describe('POST /api/users (signup)', () => {
     expect(user?.phone).toMatch(/^\+33[0-9]{9}$/);
   });
   it('rate-limit: deuxième création rapide même IP retourne 429', async () => {
-    const e2 = `rate2-${Date.now()}@local.test`;
     const ip = '10.10.10.10';
+    const e1 = `rate1-${Date.now()}@local.test`;
+    const r1 = await POST(makeReq({ email: e1, password, firstName, lastName, phone: '+33123456780', acceptTerms: true }, ip));
+    expect(r1.status).toBe(201); // Première requête réussie
+
+    const e2 = `rate2-${Date.now()}@local.test`;
     const r2 = await POST(makeReq({ email: e2, password, firstName, lastName, phone: '+33123456781', acceptTerms: true }, ip));
-    expect(r2.status).toBe(429);
+    expect(r2.status).toBe(429); // Deuxième requête bloquée
   });
 });

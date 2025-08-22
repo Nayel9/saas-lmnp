@@ -60,8 +60,13 @@ export function NavBar() {
       {user && (
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium">{displayName}</span>
-          <button onClick={logout} className="btn-ghost px-3 py-1.5 text-xs" aria-label="Se déconnecter">Déconnexion</button>
+          <button onClick={logout} className="btn-primary px-3 py-1.5 text-xs" aria-label="Se déconnecter">Déconnexion</button>
         </div>
+      )}
+      {!user && (
+      <div className="flex items-center gap-3">
+        <Link href="/login" className="btn-primary px-3 py-1.5 text-xs" aria-label="Se connecter">Connexion</Link>
+      </div>
       )}
     </nav>
   );
