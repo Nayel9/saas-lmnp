@@ -3,13 +3,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import { z } from "zod";
-import { InputField } from "@/components/forms/input-field";
-import { PasswordField } from "@/components/forms/password-field";
-import { PasswordStrengthMeter } from "@/components/forms/password-strength-meter";
+import { InputField } from "@/components/ui/forms/input-field";
+import { PasswordField } from "@/components/ui/forms/password-field";
+import { PasswordStrengthMeter } from "@/components/ui/forms/password-strength-meter";
 import SignupVerifyModal from "@/components/auth/SignupVerifyModal";
-import { Button } from "@mantine/core";
 import { FcGoogle } from "react-icons/fc";
-import { FaApple } from "react-icons/fa6";
+import { FaLinkedin } from "react-icons/fa6";
+import TWSpinner from "@/components/ui/loader/spinner";
 
 type Mode = "login" | "signup";
 
@@ -61,14 +61,13 @@ export default function LoginPageClient() {
     phone: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [loading, setLoading] = useState(false);
   const [resent, setResent] = useState(false);
   const [honeyValue, setHoneyValue] = useState("");
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false); // ajout état
-  const [isLoading, setIsLoading] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated" && !showVerifyModal)
@@ -100,39 +99,38 @@ export default function LoginPageClient() {
       setErrors({});
       setEmailNotVerified(false);
       setSuccessMessage(null);
+      setIsBusy(true);
 
-      if (honeyValue) {
-        // Honeypot
-        setLoading(true);
-        setTimeout(() => {
-          router.push("/");
-        }, 1200);
-        return;
-      }
-
-      if (mode === "signup") {
-        const parsed = signupSchema.safeParse(formData);
-        if (!parsed.success) {
-          const fieldErrors = parsed.error.flatten().fieldErrors;
-          setErrors({
-            email: fieldErrors.email?.[0],
-            password: fieldErrors.password?.[0],
-            confirmPassword: fieldErrors.confirmPassword?.[0],
-            firstName: fieldErrors.firstName?.[0],
-            lastName: fieldErrors.lastName?.[0],
-            phone: fieldErrors.phone?.[0],
-          });
+      try {
+        if (honeyValue) {
+          // Honeypot
+          setTimeout(() => {
+            router.push("/");
+          }, 1200);
           return;
         }
-        if (!acceptTerms) {
-          setErrors({
-            terms: "Vous devez accepter les conditions pour créer un compte.",
-          });
-          return;
-        }
-        setLoading(true);
-        try {
-          const resp = await fetch("/api/users", {
+
+        if (mode === "signup") {
+          const parsed = signupSchema.safeParse(formData);
+          if (!parsed.success) {
+            const fieldErrors = parsed.error.flatten().fieldErrors;
+            setErrors({
+              email: fieldErrors.email?.[0],
+              password: fieldErrors.password?.[0],
+              confirmPassword: fieldErrors.confirmPassword?.[0],
+              firstName: fieldErrors.firstName?.[0],
+              lastName: fieldErrors.lastName?.[0],
+              phone: fieldErrors.phone?.[0],
+            });
+            return;
+          }
+          if (!acceptTerms) {
+            setErrors({
+              terms: "Vous devez accepter les conditions pour créer un compte.",
+            });
+            return;
+          }
+          await fetch("/api/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -144,58 +142,38 @@ export default function LoginPageClient() {
               acceptTerms: true,
             }),
           });
-          if (!resp.ok) {
-            if (resp.status === 409) {
-              setErrors({ global: "Email déjà utilisé" });
-            } else if (resp.status === 400) {
-              setErrors({ global: "Données invalides" });
+          setShowVerifyModal(true);
+          setFormData((f) => ({ ...f, password: "", confirmPassword: "" }));
+        } else {
+          const parsed = loginSchema.safeParse(formData);
+          if (!parsed.success) {
+            const fieldErrors = parsed.error.flatten().fieldErrors;
+            setErrors({
+              email: fieldErrors.email?.[0],
+              password: fieldErrors.password?.[0],
+            });
+            return;
+          }
+          const res = await signIn("credentials", {
+            email: formData.email,
+            password: formData.password,
+            redirect: false,
+          });
+          if (res?.error) {
+            if (res.error === "EMAIL_NOT_VERIFIED") {
+              setEmailNotVerified(true);
+              setErrors({ global: "Votre email n'est pas vérifié." });
             } else {
-              setErrors({ global: "Erreur serveur" });
+              setErrors({ global: "Identifiants invalides" });
             }
             return;
           }
-          console.log("[signup] création OK -> ouverture modale vérification");
-          setShowVerifyModal(true);
-          setFormData((f) => ({ ...f, password: "", confirmPassword: "" }));
-        } catch {
-          setErrors({ global: "Erreur réseau" });
-        } finally {
-          setLoading(false);
+          router.push("/dashboard");
         }
-        return;
-      }
-
-      // mode login
-      const parsed = loginSchema.safeParse(formData);
-      if (!parsed.success) {
-        const fieldErrors = parsed.error.flatten().fieldErrors;
-        setErrors({
-          email: fieldErrors.email?.[0],
-          password: fieldErrors.password?.[0],
-        });
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await signIn("credentials", {
-          email: formData.email,
-          password: formData.password,
-          redirect: false,
-        });
-        if (res?.error) {
-          if (res.error === "EMAIL_NOT_VERIFIED") {
-            setEmailNotVerified(true);
-            setErrors({ global: "Votre email n'est pas vérifié." });
-          } else {
-            setErrors({ global: "Identifiants invalides" });
-          }
-          return;
-        }
-        router.push("/dashboard");
       } catch {
         setErrors({ global: "Erreur serveur" });
       } finally {
-        setLoading(false);
+        setIsBusy(false);
       }
     },
     [formData, honeyValue, mode, router, acceptTerms],
@@ -217,13 +195,24 @@ export default function LoginPageClient() {
   };
 
   const handleGoogleSignIn = async () => {
-    setIsLoading(true);
+    setIsBusy(true);
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("google", { callbackUrl: "/auth/pending?to=/dashboard" });
     } catch (error) {
       console.error("Google sign-in failed:", error);
     } finally {
-      setIsLoading(false);
+      setIsBusy(false);
+    }
+  };
+
+  const handleLinkedInSignIn = async () => {
+    setIsBusy(true);
+    try {
+      await signIn("linkedin", { callbackUrl: "/auth/pending?to=/dashboard" });
+    } catch (error) {
+      console.error("LinkedIn sign-in failed:", error);
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -243,295 +232,299 @@ export default function LoginPageClient() {
       className="min-h-screen flex flex-col items-center px-4 py-10"
     >
       <div
-        className="w-full max-w-md card"
+        className="w-full max-w-md card relative"
         role="region"
         aria-labelledby="auth-title"
       >
-        <h1
-          id="auth-title"
-          className="text-xl font-semibold tracking-tight mb-2"
-        >
-          Authentification
-        </h1>
-        <p className="text-sm text-muted-foreground mb-6">
-          Accédez à votre espace.
-        </p>
-        <div
-          className="flex items-center gap-2 mb-6"
-          role="tablist"
-          aria-label="Modes d'authentification"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "login"}
-            className={`btn text-sm px-3 py-1.5 ${mode === "login" ? "bg-bg-muted" : "btn-ghost"}`}
-            onClick={() => {
-              setMode("login");
-              setErrors({});
-              setSuccessMessage(null);
-            }}
-          >
-            Se connecter
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "signup"}
-            className={`btn text-sm px-3 py-1.5 ${mode === "signup" ? "bg-bg-muted" : "btn-ghost"}`}
-            onClick={() => {
-              setMode("signup");
-              setErrors({});
-              setSuccessMessage(null);
-              setEmailNotVerified(false);
-            }}
-          >
-            Créer un compte
-          </button>
-        </div>
-        {verifiedParam === "1" && (
-          <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700">
-            Email vérifié, vous pouvez maintenant vous connecter.
-          </div>
-        )}
-        {verifiedParam === "0" && (
-          <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600">
-            Lien invalide ou expiré, renvoyez un email de vérification.
-          </div>
-        )}
-        {errors.global && (
-          <div
-            className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600"
-            role="alert"
-          >
-            {errors.global}
-          </div>
-        )}
-        {successMessage && (
-          <div
-            className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700"
-            role="status"
-          >
-            {successMessage}
-          </div>
-        )}
-        <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              overflow: "hidden",
-              height: 0,
-              width: 0,
-              clip: "rect(0 0 0 0)",
-              clipPath: "inset(50%)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <label htmlFor="website">Ne pas remplir ce champ</label>
-            <input
-              id="website"
-              name="website"
-              type="text"
-              tabIndex={-1}
-              autoComplete="off"
-              value={honeyValue}
-              onChange={onChange}
-            />
-          </div>
-          <InputField
-            id="email"
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={onChange}
-            disabled={loading}
-            error={errors.email}
-            placeholder="vous@exemple.fr"
-            autoComplete="email"
-          />
-          <PasswordField
-            id="password"
-            label="Mot de passe"
-            value={formData.password}
-            onChange={onChange}
-            disabled={loading}
-            error={errors.password}
-            placeholder="••••••••"
-            autoComplete={
-              mode === "login" ? "current-password" : "new-password"
-            }
-          />
-          {showStrength && (
-            <PasswordStrengthMeter
-              password={formData.password}
-              className="bg-white"
-            />
-          )}
-          {mode === "signup" && (
-            <PasswordField
-              id="confirmPassword"
-              label="Confirmer le mot de passe"
-              value={formData.confirmPassword}
-              onChange={onChange}
-              disabled={loading}
-              error={errors.confirmPassword}
-              placeholder="••••••••"
-              autoComplete="new-password"
-            />
-          )}
-
-          {mode === "signup" && (
-            <>
-              <InputField
-                id="firstName"
-                label="Prénom"
-                value={formData.firstName}
-                onChange={onChange}
-                disabled={loading}
-                error={errors.firstName}
-                placeholder="Votre prénom"
-                autoComplete="given-name"
-              />
-              <InputField
-                id="lastName"
-                label="Nom"
-                value={formData.lastName}
-                onChange={onChange}
-                disabled={loading}
-                error={errors.lastName}
-                placeholder="Votre nom"
-                autoComplete="family-name"
-              />
-              <InputField
-                id="phone"
-                label="Téléphone"
-                value={formData.phone}
-                onChange={onChange}
-                disabled={loading}
-                error={errors.phone}
-                placeholder="+33 ..."
-                autoComplete="tel"
-              />
-              <div className="flex items-start gap-2 text-xs mt-2">
-                <input
-                  id="acceptTerms"
-                  type="checkbox"
-                  className="mt-0.5 cursor-pointer"
-                  checked={acceptTerms}
-                  onChange={(e) => {
-                    setAcceptTerms(e.target.checked);
-                    if (errors.terms)
-                      setErrors((prev) => ({ ...prev, terms: undefined }));
-                  }}
-                />
-                <label
-                  htmlFor="acceptTerms"
-                  className="cursor-pointer select-none leading-relaxed"
-                >
-                  J`&#39;accepte les{" "}
-                  <a
-                    href="/cgv"
-                    className="underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    CGV
-                  </a>{" "}
-                  et la{" "}
-                  <a
-                    href="/politique-confidentialite"
-                    className="underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Politique de confidentialité
-                  </a>
-                  . <span className="text-red-600">(Obligatoire)</span>
-                </label>
-              </div>
-              {errors.terms && (
-                <p className="text-red-600 text-[11px] mt-1" role="alert">
-                  {errors.terms}
-                </p>
-              )}
-            </>
-          )}
-          {/*<Button*/}
-          {/*  onClick={handleGoogleSignIn}*/}
-          {/*  loading={isLoading}*/}
-          {/*  variant="outline"*/}
-          {/*  color="blue"*/}
-          {/*  className="mt-4"*/}
-          {/*>*/}
-          {/*  Continuer avec Google*/}
-          {/*</Button>*/}
-          <button
-            type="submit"
-            disabled={loading || (mode === "signup" && !acceptTerms)}
-            className="btn-primary h-10 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-disabled={loading || (mode === "signup" && !acceptTerms)}
-          >
-            {loading
-              ? "…"
-              : mode === "login"
-                ? "Se connecter"
-                : "Créer le compte"}
-          </button>
-          {mode === "login" && (
-            <div
-              className="grid grid-cols-2 gap-2 mt-1"
-              aria-label="Boutons SSO"
-            >
-              <Button
-                type="button"
-                aria-selected={mode === "login"}
-                className="btn bg-foreground  cursor-pointer"
-                title="Connexion avec Google"
-                onClick={handleGoogleSignIn}
-                loading={isLoading}
-              >
-                <FcGoogle size={28} />
-              </Button>
-              <Button
-                type="button"
-                disabled
-                className="btn bg-muted-foreground text-foreground cursor-not-allowed"
-                aria-disabled="true"
-                title="Bientôt"
-              >
-                <FaApple size={28} />
-              </Button>
+        {isBusy ? (
+          <div className="flex flex-col items-center gap-3 w-full h-full max-w-md">
+            <div className="text-brand">
+              <TWSpinner />
             </div>
-          )}
-          {emailNotVerified && mode === "login" && (
-            <button
-              type="button"
-              onClick={resend}
-              disabled={resent}
-              className="underline text-xs text-muted-foreground disabled:opacity-50 self-start"
+            <p className="text-xl text-muted-foreground">Chargement...</p>
+          </div>
+        ) : (
+          <>
+            <h1
+              id="auth-title"
+              className="text-xl font-semibold tracking-tight mb-2"
             >
-              Renvoyer l&apos;email de vérification
-            </button>
-          )}
-        </form>
-        <div aria-live="polite" className="sr-only" />
-        <hr className="my-6 border-border" />
-        <div className="text-xs leading-relaxed text-muted-foreground">
-          <h2 className="font-semibold mb-1 text-sm">Notes</h2>
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Email vérifié requis avant première connexion.</li>
-            <li>
-              Mot de passe: 8+ caractères (force affichée à l&apos;inscription).
-            </li>
-            {/* Correction apostrophe */}
-            <li className="hidden">Mot de passe info fallback</li>
-            <li>
-              Les comptes existants peuvent demander un renvoi de mail si non
-              vérifiés.
-            </li>
-          </ul>
-        </div>
+              Authentification
+            </h1>
+            <p className="text-sm text-muted-foreground mb-6">
+              Accédez à votre espace.
+            </p>
+            <div
+              className="flex items-center gap-2 mb-6"
+              role="tablist"
+              aria-label="Modes d'authentification"
+            >
+              <button
+                type="button"
+                role="tab"
+                className={`btn text-sm px-3 py-1.5 ${mode === "login" ? "bg-bg-muted" : "btn-ghost"}`}
+                onClick={() => {
+                  setMode("login");
+                  setErrors({});
+                  setSuccessMessage(null);
+                }}
+                disabled={isBusy}
+              >
+                Se connecter
+              </button>
+              <button
+                type="button"
+                role="tab"
+                className={`btn text-sm px-3 py-1.5 ${mode === "signup" ? "bg-bg-muted" : "btn-ghost"}`}
+                onClick={() => {
+                  setMode("signup");
+                  setErrors({});
+                  setSuccessMessage(null);
+                  setEmailNotVerified(false);
+                }}
+                disabled={isBusy}
+              >
+                Créer un compte
+              </button>
+            </div>
+            {verifiedParam === "1" && (
+              <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700">
+                Email vérifié, vous pouvez maintenant vous connecter.
+              </div>
+            )}
+            {verifiedParam === "0" && (
+              <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+                Lien invalide ou expiré, renvoyez un email de vérification.
+              </div>
+            )}
+            {errors.global && (
+              <div
+                className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-600"
+                role="alert"
+              >
+                {errors.global}
+              </div>
+            )}
+            {successMessage && (
+              <div
+                className="mb-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700"
+                role="status"
+              >
+                {successMessage}
+              </div>
+            )}
+            <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  overflow: "hidden",
+                  height: 0,
+                  width: 0,
+                  clip: "rect(0 0 0 0)",
+                  clipPath: "inset(50%)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <label htmlFor="website">Ne pas remplir ce champ</label>
+                <input
+                  id="website"
+                  name="website"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeyValue}
+                  onChange={onChange}
+                />
+              </div>
+              <InputField
+                id="email"
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={onChange}
+                disabled={isBusy}
+                error={errors.email}
+                placeholder="vous@exemple.fr"
+                autoComplete="email"
+              />
+              <PasswordField
+                id="password"
+                label="Mot de passe"
+                value={formData.password}
+                onChange={onChange}
+                disabled={isBusy}
+                error={errors.password}
+                placeholder="••••••••"
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
+              />
+              {showStrength && (
+                <PasswordStrengthMeter
+                  password={formData.password}
+                  className="bg-white"
+                />
+              )}
+              {mode === "signup" && (
+                <PasswordField
+                  id="confirmPassword"
+                  label="Confirmer le mot de passe"
+                  value={formData.confirmPassword}
+                  onChange={onChange}
+                  disabled={isBusy}
+                  error={errors.confirmPassword}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              )}
+
+              {mode === "signup" && (
+                <>
+                  <InputField
+                    id="firstName"
+                    label="Prénom"
+                    value={formData.firstName}
+                    onChange={onChange}
+                    disabled={isBusy}
+                    error={errors.firstName}
+                    placeholder="Votre prénom"
+                    autoComplete="given-name"
+                  />
+                  <InputField
+                    id="lastName"
+                    label="Nom"
+                    value={formData.lastName}
+                    onChange={onChange}
+                    disabled={isBusy}
+                    error={errors.lastName}
+                    placeholder="Votre nom"
+                    autoComplete="family-name"
+                  />
+                  <InputField
+                    id="phone"
+                    label="Téléphone"
+                    value={formData.phone}
+                    onChange={onChange}
+                    disabled={isBusy}
+                    error={errors.phone}
+                    placeholder="+33 ..."
+                    autoComplete="tel"
+                  />
+                  <div className="flex items-start gap-2 text-xs mt-2">
+                    <input
+                      id="acceptTerms"
+                      type="checkbox"
+                      className="mt-0.5 cursor-pointer"
+                      checked={acceptTerms}
+                      onChange={(e) => {
+                        setAcceptTerms(e.target.checked);
+                        if (errors.terms)
+                          setErrors((prev) => ({ ...prev, terms: undefined }));
+                      }}
+                    />
+                    <label
+                      htmlFor="acceptTerms"
+                      className="cursor-pointer select-none leading-relaxed"
+                    >
+                      J`&#39;accepte les{" "}
+                      <a
+                        href="/cgv"
+                        className="underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        CGV
+                      </a>{" "}
+                      et la{" "}
+                      <a
+                        href="/politique-confidentialite"
+                        className="underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Politique de confidentialité
+                      </a>
+                    </label>
+                  </div>
+                  {errors.terms && (
+                    <p className="text-red-600 text-[11px] mt-1" role="alert">
+                      {errors.terms}
+                    </p>
+                  )}
+                </>
+              )}
+              <button
+                type="submit"
+                disabled={isBusy || (mode === "signup" && !acceptTerms)}
+                className="btn-primary h-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-disabled={isBusy || (mode === "signup" && !acceptTerms)}
+              >
+                {isBusy
+                  ? "…"
+                  : mode === "login"
+                    ? "Se connecter"
+                    : "Créer le compte"}
+              </button>
+              {mode === "login" && (
+                <div className="flex flex-col">
+                  <p className="text-l text-center text-muted-foreground">
+                    Ou se connecter avec :
+                  </p>
+                  <div
+                    className="grid grid-cols-2 gap-2 mt-1"
+                    aria-label="Boutons SSO"
+                  >
+                    <button
+                      type="button"
+                      className="btn bg-foreground hover:bg-muted-foreground cursor-pointer"
+                      title="Connexion avec Google"
+                      onClick={handleGoogleSignIn}
+                    >
+                      <FcGoogle size={28} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn bg-linkedin text-foreground hover:bg-foreground hover:text-linkedin cursor-pointer"
+                      title="Connexion avec LinkedIn"
+                      onClick={handleLinkedInSignIn}
+                    >
+                      <FaLinkedin size={28} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {emailNotVerified && mode === "login" && (
+                <button
+                  type="button"
+                  onClick={resend}
+                  disabled={resent}
+                  className="underline text-xs text-muted-foreground disabled:opacity-50 self-start"
+                >
+                  Renvoyer l&apos;email de vérification
+                </button>
+              )}
+            </form>
+            <div aria-live="polite" className="sr-only" />
+            <hr className="my-6 border-border" />
+            <div className="text-xs leading-relaxed text-muted-foreground">
+              <h2 className="font-semibold mb-1 text-sm">Notes</h2>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Email vérifié requis avant première connexion.</li>
+                <li>
+                  Mot de passe: 8+ caractères (force affichée à
+                  l&apos;inscription).
+                </li>
+                {/* Correction apostrophe */}
+                <li className="hidden">Mot de passe info fallback</li>
+                <li>
+                  Les comptes existants peuvent demander un renvoi de mail si
+                  non vérifiés.
+                </li>
+              </ul>
+            </div>
+          </>
+        )}
       </div>
       <SignupVerifyModal
         opened={showVerifyModal}

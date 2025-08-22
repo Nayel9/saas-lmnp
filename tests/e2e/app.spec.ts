@@ -95,12 +95,22 @@ test.describe.serial('E2E scénario complet', () => {
     await page.goto('/journal/ventes');
     await page.locator('button:has-text("Ajouter")').click();
     const venteLabel = uniq('E2E Vente Test');
+    // Vérifier que le bouton est initialement activé
+    const saveButton = page.locator('button:has-text("Enregistrer")');
+    await expect(saveButton).toBeEnabled();
+
+    // Remplir les champs requis
     await page.fill('input[name="designation"]', venteLabel);
     const venteAccInput = page.locator('input[aria-label="Recherche compte comptable"]');
     await venteAccInput.fill('706');
     await page.locator('button:has-text("706 –")').first().click();
     await page.fill('input[name="amount"]', '500');
-    await page.click('button:has-text("Enregistrer")');
+
+    // Vérifier que le bouton est activé après remplissage
+    await expect(saveButton).toBeEnabled();
+
+    // Cliquer sur le bouton et vérifier la soumission
+    await saveButton.click();
     await expect(page.locator(`td:has-text("${venteLabel}")`).first()).toBeVisible();
 
     await page.goto('/journal/achats');

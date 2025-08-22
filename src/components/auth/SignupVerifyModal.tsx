@@ -1,6 +1,4 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Text, Loader, Alert} from '@mantine/core';
-import {notifications} from '@mantine/notifications';
 import {useRouter} from 'next/navigation';
 import { X } from 'lucide-react';
 
@@ -79,7 +77,7 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
         if (r.ok) {
           const data = await r.json();
           if (data.verified) {
-            notifications.show({title: 'Email vérifié', message: 'Email vérifié !', color: 'green'});
+            //window.alert('Email vérifié !'); // Optionnel
             onClose();
             router.push('/login?verified=1');
             return;
@@ -133,10 +131,11 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
             </button>
             <h2 id="signup-verify-title" className="text-lg font-semibold pr-8">Vérifiez vos emails</h2>
             <div id="signup-verify-desc" className="text-sm flex flex-col gap-2">
-              <Text size="sm">Nous avons envoyé un lien de confirmation à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.</Text>
+              <span className="text-sm">Nous avons envoyé un lien de confirmation à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.</span>
               <div className="flex items-center gap-2 text-xs">
-                <Loader size="sm" aria-label="En attente de vérification" />
-                <Text size="xs" c="dimmed">{polling ? 'En attente de la vérification…' : 'Vous pouvez renvoyer un email.'}</Text>
+                {/* Loader remplacé par un spinner SVG */}
+                <svg className="animate-spin h-4 w-4 text-muted-foreground" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span className="text-xs text-muted-foreground">{polling ? 'En attente de la vérification…' : 'Vous pouvez renvoyer un email.'}</span>
               </div>
               <div className="flex flex-wrap gap-2 mt-1">
                 <button data-testid="resend-btn" type="button" onClick={doResend} disabled={inCooldown || resendState==='loading'}
@@ -148,11 +147,13 @@ export function SignupVerifyModal({opened, onClose, email, enablePolling = true}
                   Accueil
                 </button>
               </div>
-              <Text size="xs" c="dimmed">Pas reçu ? Vérifiez les indésirables.</Text>
+              <span className="text-xs text-muted-foreground">Pas reçu ? Vérifiez les indésirables.</span>
+
               {message && (
-                <Alert color={resendState === 'error' ? 'red' : 'blue'} title={resendState === 'error' ? 'Erreur' : 'Info'} data-testid="resend-alert" radius="sm" mt="xs">
+                <div data-testid="resend-alert" className={`rounded p-2 mt-2 text-xs ${resendState === 'error' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                  <strong className="block mb-1">{resendState === 'error' ? 'Erreur' : 'Info'}</strong>
                   {message}
-                </Alert>
+                </div>
               )}
             </div>
           </div>

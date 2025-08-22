@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* app/globals.css */
 
 /* ---- Thème clair par défaut (Tailwind v4: tokens @theme) ---- */
 @theme {
@@ -27,6 +26,7 @@
     --color-brand: oklch(.74 .16 208);            /* ~ cyan-600 */
     --color-brand-foreground: oklch(.22 .03 220); /* texte sur bouton brand */
     --color-ring: oklch(.78 .15 208);
+    --color-linkedin: oklch(0.5014 0.1589 254.75);
 
     /* Neutres & surfaces */
     --color-bg: oklch(.98 .01 255);        /* fond page très clair */
