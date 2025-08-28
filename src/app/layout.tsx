@@ -6,6 +6,7 @@ import Providers from "./providers";
 import { NavBar } from "@/components/NavBar";
 import React from "react";
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "LMNP App – Comptabilité LMNP simple (amortissements, 2033C/E/A)",
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <Providers>
       <NavBar />
       <div className="flex-1">{children}</div>
+      <Toaster />
     </Providers>
     </body>
     </html>

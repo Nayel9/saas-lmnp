@@ -25,7 +25,19 @@ export default async function DashboardPage() {
                     <p className="text-xs text-muted-foreground"><Link href="/admin" className="underline">Accès administration</Link></p>
                 )}
             </header>
-            <section className="grid gap-6 md:grid-cols-2">
+          {/* Banner profil incomplet (SSO uniquement) */}
+          {user?.isSso && user?.needsProfile && (
+            <div className="rounded-[var(--radius)] p-4 border border-border bg-blue-100 text-blue-800">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm">
+                  Votre profil est incomplet. Merci de renseigner votre prénom, nom et téléphone.
+                </p>
+                <a href="/onboarding/profile" className="btn-ghost whitespace-nowrap">Compléter maintenant</a>
+              </div>
+            </div>
+          )}
+
+          <section className="grid gap-6 md:grid-cols-2">
                 <div className="card space-y-4">
                     <h2 className="text-lg font-medium">Nouveau bien</h2>
                     <form action={createProperty} className="space-y-3">
