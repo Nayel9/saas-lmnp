@@ -27,7 +27,8 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "types": ["vitest/globals", "node"]
   },
   "include": [
     "next-env.d.ts",
