@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { generateVerificationToken, sendVerificationEmail } from '@/lib/mailer/brevo';
 import { storePlainVerificationToken } from '@/lib/auth/emailVerificationStore';
 import { normalizePhone } from '@/lib/phone';
-import { SIGNUP_WINDOW_MS, getSignupRateLimiter } from '@/lib/signupRateLimit';
+import { ensureRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -20,17 +20,8 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const signupRL = getSignupRateLimiter();
-
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'ip';
-    const now = Date.now();
-    const last = signupRL.get(ip);
-
-    if (last && (now - last) < SIGNUP_WINDOW_MS) {
-      signupRL.set(ip, now);
-      return new Response('Trop de tentatives, réessayez plus tard', { status: 429 });
-    }
-    signupRL.set(ip, now);
+    const limited = ensureRateLimit(req, 'signup', { capacity: 1, windowMs: 60_000 });
+    if (limited) return limited;
 
     const body = await req.json();
     const parsed = schema.safeParse(body);

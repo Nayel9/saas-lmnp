@@ -95,6 +95,11 @@ export async function requireVerifiedCredentials(
 /* ---------------- NextAuth v5 config ---------------- */
 const adapter: Adapter = PrismaAdapter(prisma);
 
+// Alerte de config en production
+if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_URL) {
+    console.warn('[auth] NEXTAUTH_URL n\'est pas défini en production. Définissez-le pour des redirections correctes.');
+}
+
 export const authOptions: NextAuthConfig = {
     adapter,
     session: { strategy: "jwt" },
@@ -207,7 +212,18 @@ export const authOptions: NextAuthConfig = {
             t.needsProfile = !t.firstName || !t.lastName || !t.phone;
             return t;
         },
+        async redirect({ url, baseUrl }) {
+            try {
+                const u = new URL(url);
+                if (u.origin === baseUrl) return url;
+            } catch {
+                // ignore parse errors (relative URLs)
+            }
+            if (url.startsWith('/')) return `${baseUrl}${url}`;
+            return baseUrl;
+        },
     },
     pages: { signIn: "/login" },
     trustHost: true,
+    debug: process.env.NODE_ENV !== 'production',
 };

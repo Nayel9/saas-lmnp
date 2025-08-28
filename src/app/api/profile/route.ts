@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth/core";
+import { ensureRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   firstName: z.string().min(1).max(50),
@@ -16,6 +17,9 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = ensureRateLimit(req, 'profile-update', { capacity: 5 });
+  if (limited) return limited;
+
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });

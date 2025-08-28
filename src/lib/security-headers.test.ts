@@ -1,40 +1,32 @@
 import { describe, it, expect } from 'vitest';
 import { buildSecurityHeaders } from './security-headers';
 
-function getCsp(headers: { key: string; value: string }[]) {
-  return headers.find(h => h.key === 'Content-Security-Policy')?.value || '';
+function get(headers: { key: string; value: string }[], key: string) {
+  return headers.find(h => h.key.toLowerCase() === key.toLowerCase())?.value || '';
 }
 
-function parseDirective(csp: string, name: string) {
-  const re = new RegExp(`${name} ([^;]+)`);
-  const m = csp.match(re);
-  return m ? m[1].trim().split(/\s+/) : [];
+function has(headers: { key: string; value: string }[], key: string) {
+  return headers.some(h => h.key.toLowerCase() === key.toLowerCase());
 }
 
-describe('buildSecurityHeaders', () => {
-  it('inclut localhost:54321 en dev sans URL explicite', () => {
-    const hs = buildSecurityHeaders({ env: 'development', supabaseUrl: undefined });
-    const csp = getCsp(hs);
-    const connect = parseDirective(csp, 'connect-src');
-    expect(connect).toContain("http://localhost:54321");
-    expect(connect).toContain("ws://localhost:54321");
+describe('buildSecurityHeaders (CSP minimale)', () => {
+  it('inclut les directives essentielles en dev', () => {
+    const hs = buildSecurityHeaders({ env: 'development' });
+    const csp = get(hs, 'Content-Security-Policy');
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("img-src 'self' data: https:");
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval' https:");
+    expect(csp).toContain("style-src 'self' 'unsafe-inline' https:");
+    expect(csp).toContain("connect-src 'self' https:");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(get(hs, 'X-Content-Type-Options')).toBe('nosniff');
+    expect(get(hs, 'Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+    expect(get(hs, 'Permissions-Policy')).toContain('camera=()');
+    expect(get(hs, 'X-Frame-Options')).toBe('DENY');
+    expect(has(hs, 'Strict-Transport-Security')).toBe(false);
   });
-  it('ajoute origin Supabase custom et son ws', () => {
-    const hs = buildSecurityHeaders({ env: 'development', supabaseUrl: 'http://localhost:54321' });
-    const csp = getCsp(hs);
-    const connect = parseDirective(csp, 'connect-src');
-    // pas de doublons multiples critiques, présence origin
-    const occurrences = connect.filter(s => s === 'http://localhost:54321').length;
-    expect(occurrences).toBeGreaterThanOrEqual(1);
-  });
-  it('gère URL cloud https', () => {
-    const hs = buildSecurityHeaders({ env: 'production', supabaseUrl: 'https://proj.supabase.co' });
-    const csp = getCsp(hs);
-    const connect = parseDirective(csp, 'connect-src');
-    expect(connect.some(s => s.includes('proj.supabase.co'))).toBe(true);
-    expect(connect.some(s => s.startsWith('wss://proj.supabase.co'))).toBe(true);
-    // HSTS présent en prod
-    expect(hs.find(h=>h.key==='Strict-Transport-Security')).toBeDefined();
+  it('ajoute HSTS en production', () => {
+    const hs = buildSecurityHeaders({ env: 'production' });
+    expect(has(hs, 'Strict-Transport-Security')).toBe(true);
   });
 });
-
