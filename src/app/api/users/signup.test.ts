@@ -13,8 +13,8 @@ vi.mock('@/lib/prisma', () => {
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { POST } from './route';
-import { getSignupRateLimiter } from '@/lib/signupRateLimit';
 import { NextRequest } from 'next/server';
+import { globalRateLimiter } from '@/lib/rate-limit';
 
 function makeReq(body: unknown, ip = '127.0.0.1') { return new NextRequest('http://localhost/api/users', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip } }); }
 
@@ -24,12 +24,9 @@ const firstName = 'Jean';
 const lastName = 'Dupont';
 const phone = '+33123456789';
 
-// Utilise la fonction pour accéder à signupRL
-const signupRL = getSignupRateLimiter();
-
 describe('POST /api/users (signup)', () => {
   beforeEach(() => {
-    signupRL.clear(); // Réinitialise la Map de limitation de débit avant chaque test
+    globalRateLimiter.reset();
   });
 
   afterAll(async () => { await prisma.user.deleteMany({ where: { email } }); });

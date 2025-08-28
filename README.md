@@ -18,12 +18,56 @@ Supprimés / obsolètes (après retrait Supabase pour auth) : `NEXT_PUBLIC_SUPAB
 
 ## Authentification (NextAuth v5 Credentials)
 - Provider actif: Credentials (email + mot de passe hashé bcrypt)
-- Providers futurs (commentés / à activer plus tard): Google, Apple
+- Providers futurs: Google, LinkedIn (déjà câblés)
 - Inscription: `POST /api/users` (zod + bcrypt) – route forcée en runtime Node (`export const runtime = 'nodejs'`) car bcrypt JS n'est pas compatible Edge
 - Connexion: `signIn('credentials', { email, password })`
 - Session: JWT (`session.user.id`, `role`, `plan`)
-- Accès: `/dashboard`, `/assets`, `/journal/*`, `/reports/*` protégés; `/admin` et `/reports/*` exigent rôle `admin`
-- Tests: unitaires (validateCredentials, signup) + E2E (login/logout, iso multi-utilisateurs)
+- Pages protégées: `/dashboard`, `/assets`, `/journal/*`, `/reports/*`; `/admin` exige rôle `admin`
+
+### Sécurisation Auth (PR L3)
+- Redirect callback sûr (anti open-redirect):
+  - Implémenté dans `src/lib/auth/options.ts` → `callbacks.redirect`
+  - Logique: si l'URL est relative → préfixée par `baseUrl`; si absolue mais même origin que `baseUrl` → acceptée; sinon → redirigée vers `baseUrl`.
+- Debug: `debug=false` en production (activé seulement hors prod).
+- `NEXTAUTH_URL`: en production, doit être défini. Un avertissement est émis au démarrage s'il manque.
+
+### Rate‑limit basique (in‑memory)
+- Implémentation: `src/lib/rate-limit.ts` (token bucket, clé = `ip|route`, fenêtre 60s, capacité par défaut 5).
+- Appliqué à:
+  - `POST /api/users` (signup): capacité 1 req / 60s / IP → 429 si dépassé.
+  - `POST /api/auth/resend-verification`: capacité 5 / 60s / IP (réponse générique, 429 si dépassé).
+  - `POST /api/profile` (optionnel): capacité 5 / 60s / IP.
+
+## En‑têtes de sécurité & CSP
+Configurés via `next.config.ts` → `headers()` en s'appuyant sur `buildSecurityHeaders`.
+- CSP minimale (adapter si nécessaire pour SSO/providers):
+  - `default-src 'self'`
+  - `img-src 'self' data: https:`
+  - `script-src 'self' 'unsafe-inline' 'unsafe-eval' https:`
+  - `style-src 'self' 'unsafe-inline' https:`
+  - `connect-src 'self' https:`
+  - `frame-ancestors 'none'`
+- Autres en‑têtes:
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+  - `X-Frame-Options: DENY`
+  - HSTS en production: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+
+### Assouplir la CSP (exemples)
+- OAuth Google ou LinkedIn: les flux Auth.js passent par des redirections serveur; la CSP ci-dessus est généralement suffisante. Si un provider nécessite des scripts/connexions spécifiques côté client, ajouter les origins requis:
+  - Scripts tiers: ajouter l'origin à `script-src` (ex: `https://accounts.google.com`).
+  - API webs: ajouter l'origin à `connect-src`.
+  - Iframe autorisé (si vraiment nécessaire): remplacer `frame-ancestors 'none'` ou retirer `X-Frame-Options: DENY` pour les pages concernées uniquement.
+- Pour ajuster globalement, modifier `src/lib/security-headers.ts`.
+
+## Tests
+- Unitaires clés ajoutés:
+  - `src/lib/auth/redirect.test.ts`: vérifie le redirect sûr (URL relative, même origin, externe → baseUrl).
+  - `src/lib/rate-limit.test.ts`: 10 requêtes < 60s → plusieurs 429 (bucket par défaut 5).
+  - `src/lib/security-headers.test.ts`: valide la CSP/headers et HSTS en prod.
+- E2E:
+  - `tests/e2e/security-auth.spec.ts`: vérifie qu'une tentative de callbackUrl externe retombe sur `baseURL` et que les en‑têtes de sécurité sont présents sur `/login`.
 
 ### Flux admin seed
 ```
@@ -32,65 +76,8 @@ pnpm admin:ensure  # crée ou met à jour l'utilisateur admin (hash bcrypt)
 Requiert `ADMIN_SEED_EMAIL` & `ADMIN_SEED_PASSWORD`.
 
 ### Vérification d'email (Brevo)
-- À l'inscription (`POST /api/users`): création utilisateur avec `emailVerified = null`, génération d'un token aléatoire (32o base64url) stocké hashé (SHA-256) dans `VerificationToken` (champ `token`). Email envoyé via Brevo avec lien `/auth/verify?token=...&email=...`.
-- Tant que l'email n'est pas vérifié, la connexion Credentials échoue avec erreur `EMAIL_NOT_VERIFIED` et l'UI propose un renvoi.
-- Vérification: `GET /auth/verify` (redirection → `/login?verified=1` si succès, sinon `?verified=0`). En succès: set `user.emailVerified = now`, suppression des tokens restants.
-- Renvoi: `POST /api/auth/resend-verification` (toujours 200 réponse générique). Rate-limit: 1 requête / 60s / IP+email (memoire).
-- Sécurité: token jamais stocké en clair (hash SHA-256 en base), expiration 24h, usage unique.
-- Variables d_env requises pour envoi réel: `BREVO_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `NEXT_PUBLIC_SITE_URL`.
-- En dev sans clé Brevo: le lien est loggué en console.
-
-#### UX post-inscription (Modale Mantine)
-Après création de compte (POST /api/users 201), une modale "Vérifiez vos emails" (Mantine Modal) s'ouvre au-dessus du formulaire :
-- Affiche l'email cible et un loader.
-- CTA "Renvoyer l'email" avec cooldown 60s (texte devient `Renvoyer (Xs)`).
-- Lien "Modifier l’adresse" qui ferme la modale (retour au formulaire pour corriger l'email avant nouvelle tentative).
-- Message générique de renvoi (jamais d'indication d'existence).
-- Polling léger (5s) vers `/api/auth/check-verified?email=...` pendant 90s max : fermeture automatique + toast si vérifié, redirection `?verified=1`.
-- Accessibilité: focus capturé par la modale, role=dialog, titre/description liés.
-
-Paramètres (constants dans `SignupVerifyModal.tsx`):
-- RESEND_COOLDOWN_MS = 60000
-- POLL_INTERVAL_MS = 5000
-- POLL_MAX_DURATION_MS = 90000
-
-Endpoints additionnels:
-| Méthode | Endpoint | Rôle |
-|---------|----------|------|
-| GET | /api/auth/check-verified?email=... | Polling statut `{"verified": boolean}` |
-
-Tests:
-- Unitaires: `SignupVerifyModal.test.tsx` (render + resend + cooldown)
-- E2E: `signup-flow.spec.ts` attend la modale post-inscription puis flux de vérification.
-
-Accessibilité / a11y:
-- Modal Mantine fournit `role="dialog"` + aria-label via titre.
-- Focus initial dans la modale; fermeture restaure interaction sur le formulaire.
-
-#### Endpoints
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | /api/users | Signup (crée compte + email de vérification) |
-| POST | /api/auth/resend-verification | Renvoi email (réponse générique) |
-| GET | /auth/verify | Consomme token et vérifie l'email |
-
-#### Variables d'environnement (ajouts)
-| Variable | Obligatoire | Rôle |
-|----------|-------------|------|
-| BREVO_API_KEY | prod oui / dev non | Clé API Brevo SMTP v3 |
-| EMAIL_FROM | oui | Adresse expéditeur vérifiée Brevo |
-| EMAIL_FROM_NAME | non | Nom expéditeur (par défaut "LMNP App") |
-| EMAIL_LOGO_URL | non | URL absolue du logo utilisé dans l'entête email (fallback: NEXT_PUBLIC_SITE_URL + /LMNPlus_logo_variant_2.png) |
-
-### Inscription – champs collectés
-- email (unique)
-- password (min 8 chars)
-- confirmPassword (front uniquement – doit matcher password, validation zod)
-- firstName (requis)
-- lastName (requis)
-- phone (requis – validation: chiffres, +, espaces, (), - ; normalisé en E.164 côté backend, échec 400 si non normalisable)
-
-Les champs firstName / lastName sont utilisés pour personnaliser l'email ("Bonjour Prénom,").
+- À l'inscription: token de vérification envoyé par email (hashé en base), expiration 24h, usage unique.
+- Renvoi: `POST /api/auth/resend-verification` (réponse 200 générique ou 429 si rate‑limit).
 
 ## Procédure DB & Migrations
 ### Initialisation
@@ -112,72 +99,20 @@ pnpm admin:ensure
 - `DATABASE_URL` : utilisé au runtime (pool vivant). 
 
 ## Scripts principaux
-- `pnpm dev` (Turbopack + Tailwind watch)
+- `pnpm dev`
 - `pnpm build` / `pnpm start`
 - `pnpm admin:ensure`
-- `pnpm db:migrate`, `pnpm db:push`, `pnpm db:studio`, `pnpm db:generate`
+- `pnpm db:*`
 - `pnpm lint`, `pnpm typecheck`
 - `pnpm test` (unit) • `pnpm test:e2e` (Playwright)
 
-## Base de données & Prisma
-Voir `prisma/schema.prisma` : domaines (Property, Income, Expense, Amortization, journal_entries, assets) + tables Auth (User, Account, Session, VerificationToken). 
-Migrations récentes ajoutent journal, assets et tables Auth (`add_user_auth`).
-
-## Journaux, Immobilisations, Rapports
-- Journal Achats / Ventes: CRUD + exports CSV/XLSX/PDF
-- Immobilisations: calcul amortissements (linéaire) + exports CSV/XLSX
-- Rapports: Balance, Grand Livre, 2033-A / C / E (exports PDF/XLSX/CSV selon cas)
-
-## Migration depuis Supabase
-- Auth Supabase retirée (plus de dépendance à `@supabase/supabase-js` dans `src/`)
-- Scripts `dbSeedDemo.ts` & `dbUnseedDemo.ts` simplifiés (placeholders) — à supprimer ou réimplémenter si réintégration future
-- Dossier `supabase/` conservé pour historique (policies RLS) : non utilisé par l'app actuelle
-- Partition multi-tenant assurée applicativement via `user_id`
-
-## Tests
-### Unitaires
-`pnpm test` couvre: formatage, sécurité headers, mapping rubriques, amortissement, ledger, PDF, calculs fiscaux, auth credentials.
-### E2E (Playwright)
-Scénarios validés:
-1. Login / logout admin
-2. Journaux achats & ventes (CRUD + exports)
-3. Immobilisation + amortissements + exports
-4. Rapports Balance & Grand Livre + 2033 A/C/E exports
-5. Isolation second utilisateur (données non croisées)
-
-Commande:
-```bash
-pnpm test:e2e
-```
-
 ## Sécurité / Bonnes pratiques
-- Bcrypt cost 10 (modifiable si besoin) – privilégier Node runtime
+- Bcrypt cost 10 – Next.js runtime Node pour les routes bcrypt
 - JWT signé via `AUTH_SECRET`
-- Pas de secrets exposés côté client
-- Exports protégés par session + rôle admin
-
-## Dépannage
-| Problème | Cause probable | Solution |
-|----------|----------------|----------|
-| `The column User.image does not exist` | Drift DB vs schema | `prisma migrate dev` ou reset (dev) |
-| Erreur bcrypt en Edge | Runtime incompatible | Ajouter `export const runtime = 'nodejs'` à la route concernée |
-| 500 signup après reset | Migrations non appliquées | Re-exécuter reset + generate |
-| Échecs tests DB distants | Pool PgBouncer + DDL | Utiliser `DIRECT_URL` pour migrations |
-
-## Roadmap
-- Activer OAuth Google / Apple (providers déjà structurés)
-- RLS Postgres (policies user_id) pour renforcement multi-tenant
-- Billing / abonnements (plans pro)
-- Optimisation perfs exports volumineux
-- Alertes / notifications financières
+- En‑têtes de sécurité & CSP minimale (voir plus haut)
 
 ## Changements récents (PR)
-- Suppression imports Supabase restants
-- Ajout tables Auth + migration `add_user_auth`
-- Forçage runtime nodejs pour route signup
-- Refactor typage tests (remplacement `any` par types explicites)
-- Mocks Prisma mémoire pour tests unitaires lourds sans DB externe
-- E2E consolidés (5 scénarios) couvrant isolation et exports
-- Ajout champs profil (firstName, lastName, phone) + email template personnalisé
-- Normalisation téléphone E.164 + téléphone rendu obligatoire
-- Validation confirmPassword (matching) sur le formulaire signup
+- L3: Sécurisation auth (redirect sûr, rate‑limit, headers)
+  - Redirect callback NextAuth sécurisé
+  - Rate‑limit token bucket commun (signup, resend-verification, profile)
+  - CSP/headers par défaut renforcés

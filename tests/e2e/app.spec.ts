@@ -181,7 +181,7 @@ test.describe.serial('E2E scénario complet', () => {
     await page.locator('button:has-text("2184")').first().click();
     await page.evaluate(() => { const el = document.querySelector('input[type="hidden"][name="account_code"]') as HTMLInputElement | null; if (el) el.value = '706'; });
     await page.locator('button:has-text("Enregistrer")').click();
-    await expect(page.locator('text=706')).toBeVisible();
+    await expect(page.getByTestId('asset-form-error')).toContainText('Compte immobilisation invalide');
     await page.locator('button:has-text("Annuler")').click();
 
     await page.click(`tr:has(td:has-text("${assetLabel}")) a:has-text("Voir")`);

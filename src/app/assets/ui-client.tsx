@@ -13,7 +13,7 @@ const schema = z.object({
   amount_ht: z.string().min(1),
   duration_years: z.string().min(1),
   acquisition_date: z.string().min(1),
-  account_code: z.enum(assetCodes)
+  account_code: z.string().refine(v => (listFor('asset').map(a=>a.code)).includes(v), 'Compte immobilisation invalide')
 });
 
 interface ActionResult { ok: boolean; error?: string }
@@ -58,7 +58,7 @@ export function AddAssetButton() {
               <button type="button" className="btn" onClick={()=>setOpen(false)}>Annuler</button>
               <button className="btn-primary" disabled={isPending || !formValid}>{isPending? 'Enregistrement...' : 'Enregistrer'}</button>
             </div>
-            {error && <p className="text-xs text-[--color-danger]">{error}</p>}
+            {error && <p data-testid="asset-form-error" className="text-xs text-[--color-danger]">{error}</p>}
           </form>
         </div>
       </div>
@@ -103,7 +103,7 @@ export function EditAssetButton({ asset }: EditProps) {
               <button type="button" className="btn" onClick={()=>setOpen(false)}>Annuler</button>
               <button className="btn-primary" disabled={isPending || !formValid}>{isPending? 'Sauvegarde...' : 'Mettre à jour'}</button>
             </div>
-            {error && <p className="text-xs text-[--color-danger]">{error}</p>}
+            {error && <p data-testid="asset-form-error" className="text-xs text-[--color-danger]">{error}</p>}
           </form>
         </div>
       </div>
