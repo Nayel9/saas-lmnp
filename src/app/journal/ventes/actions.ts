@@ -26,15 +26,15 @@ async function getUserId() {
 
 export async function createEntry(formData: FormData) {
   const parsed = entrySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: parsed.error.flatten().formErrors.join(', ') };
+  if (!parsed.success) return { ok: false, error: parsed.error.flatten().formErrors.join(', ') } as const;
   const userId = await getUserId();
   const { date, designation, tier, account_code, amount, currency } = parsed.data;
   if (isAllowed(account_code,'achat') && !isAllowed(account_code,'vente')) {
-    return { ok: false, error: 'Compte réservé aux achats' };
+    return { ok: false, error: 'Compte réservé aux achats' } as const;
   }
-  await prisma.journalEntry.create({ data: { user_id: userId, type: 'vente', date: new Date(date), designation, tier: tier || null, account_code, amount: parseFloat(amount), currency } });
+  const created = await prisma.journalEntry.create({ data: { user_id: userId, type: 'vente', date: new Date(date), designation, tier: tier || null, account_code, amount: parseFloat(amount), currency } });
   revalidatePath('/journal/ventes');
-  return { ok: true };
+  return { ok: true, id: created.id } as const;
 }
 
 export async function updateEntry(formData: FormData) {

@@ -23,34 +23,33 @@ export default function OnboardingProfilePage() {
   const router = useRouter();
   const { data: session, status, update } = useSession();
 
-  // ✅ Extraction pour des deps stables (évite le warning ESLint)
-  const needsProfile = session?.user?.needsProfile;
+  const user = session?.user;
 
   const [form, setForm] = React.useState({
-    firstName: session?.user.firstName ?? "",
-    lastName: session?.user.lastName ?? "",
-    phone: session?.user.phone ?? "",
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    phone: user?.phone ?? "",
   });
   const [errors, setErrors] = React.useState<{ [k: string]: string | undefined }>({});
   const [loading, setLoading] = React.useState(false);
 
   // Si l'utilisateur est authentifié et que le profil est déjà complet → dashboard
   React.useEffect(() => {
-    if (session?.user && !needsProfile) {
+    if (user && !user.needsProfile) {
       router.replace("/dashboard");
     }
-  }, [needsProfile, router, session?.user]);
+  }, [router, user]);
 
   // Sync du formulaire quand la session arrive/évolue (ex: SSO prérempli)
   React.useEffect(() => {
-    if (session?.user) {
+    if (user) {
       setForm({
-        firstName: session.user.firstName ?? "",
-        lastName: session.user.lastName ?? "",
-        phone: session.user.phone ?? "",
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        phone: user.phone ?? "",
       });
     }
-  }, [session?.user?.firstName, session?.user?.lastName, session?.user?.phone]);
+  }, [user]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -156,4 +155,3 @@ export default function OnboardingProfilePage() {
     </main>
   );
 }
-

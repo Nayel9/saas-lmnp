@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { AddAssetButton, EditAssetButton } from './ui-client';
 import { deleteAsset } from './actions';
 import type { Prisma } from '@prisma/client';
+import { AttachmentsButton, AttachmentsPreviewTrigger } from '@/components/attachments/AttachmentsPanel';
+import { SubmitButton } from '@/components/SubmitButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +28,14 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   ];
   const [total, rows] = await Promise.all([
     prisma.asset.count({ where }),
-    prisma.asset.findMany({ where, orderBy: { acquisition_date: 'desc' }, skip: (page-1)*PAGE_SIZE, take: PAGE_SIZE })
+    prisma.asset.findMany({ where, orderBy: { created_at: 'desc' }, skip: (page-1)*PAGE_SIZE, take: PAGE_SIZE })
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Comptage des pièces jointes par immobilisation visible
+  const assetIds = rows.map(a => a.id);
+  const countsRaw = assetIds.length ? await prisma.attachment.groupBy({ by: ['assetId'], where: { assetId: { in: assetIds } }, _count: { _all: true } }) : [];
+  const countMap = new Map<string | null, number>(countsRaw.map(c => [c.assetId, c._count._all]));
 
   async function deleteAction(formData: FormData) {
     'use server';
@@ -55,6 +62,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
               <th className="py-2 pr-4">Durée</th>
               <th className="py-2 pr-4">Compte</th>
               <th className="py-2 pr-4">Amort.</th>
+              <th className="py-2 pr-4 text-center" title="Pièces jointes">📎</th>
               <th className="py-2 pr-2" />
             </tr>
           </thead>
@@ -67,16 +75,22 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                 <td className="py-1 pr-4">{a.duration_years} ans</td>
                 <td className="py-1 pr-4">{a.account_code}</td>
                 <td className="py-1 pr-4"><Link href={`/assets/${a.id}/amortization`} className="text-brand text-xs hover:underline">Voir</Link></td>
+                <td className="py-1 pr-4 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <AttachmentsButton assetId={a.id} count={countMap.get(a.id) || 0} />
+                    <AttachmentsPreviewTrigger assetId={a.id} />
+                  </div>
+                </td>
                 <td className="py-1 pr-2 text-right">
                   <EditAssetButton asset={{ id: a.id, label: a.label, amount_ht: Number(a.amount_ht), duration_years: a.duration_years, acquisition_date: a.acquisition_date, account_code: a.account_code }} />
                   <form action={deleteAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={a.id} />
-                    <button className="text-xs text-[--color-danger] hover:underline">Suppr</button>
+                    <SubmitButton className="text-xs text-[--color-danger] hover:underline" pendingLabel="Suppression…">Suppr</SubmitButton>
                   </form>
                 </td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">Aucune immobilisation</td></tr>}
+            {!rows.length && <tr><td colSpan={8} className="py-6 text-center text-muted-foreground">Aucune immobilisation</td></tr>}
           </tbody>
         </table>
       </div>
