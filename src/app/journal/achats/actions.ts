@@ -26,16 +26,16 @@ async function getUserId() {
 
 export async function createEntry(formData: FormData) {
   const parsed = entrySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: parsed.error.flatten().formErrors.join(', ') };
+  if (!parsed.success) return { ok: false, error: parsed.error.flatten().formErrors.join(', ') } as const;
   const userId = await getUserId();
   const { date, designation, tier, account_code, amount, currency } = parsed.data;
   // Validation catalogue: si code présent mais non autorisé pour achats (et autorisé pour ventes) => rejet
   if (isAllowed(account_code, 'vente') && !isAllowed(account_code,'achat')) {
-    return { ok: false, error: 'Compte réservé aux ventes' };
+    return { ok: false, error: 'Compte réservé aux ventes' } as const;
   }
-  await prisma.journalEntry.create({ data: { user_id: userId, type: 'achat', date: new Date(date), designation, tier: tier || null, account_code, amount: parseFloat(amount), currency } });
+  const created = await prisma.journalEntry.create({ data: { user_id: userId, type: 'achat', date: new Date(date), designation, tier: tier || null, account_code, amount: parseFloat(amount), currency } });
   revalidatePath('/journal/achats');
-  return { ok: true };
+  return { ok: true, id: created.id } as const;
 }
 
 export async function updateEntry(formData: FormData) {

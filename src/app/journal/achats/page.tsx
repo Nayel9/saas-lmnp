@@ -7,6 +7,8 @@ import JournalAchatsClient from './ui-client';
 import { EditButton } from './ui-client';
 import type { Prisma } from '@prisma/client';
 import { computeVisibleTotals } from '@/lib/journal-totals';
+import { AttachmentsButton, AttachmentsPreviewTrigger } from '@/components/attachments/AttachmentsPanel';
+import { SubmitButton } from '@/components/SubmitButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +43,10 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const totals = computeVisibleTotals(entries.map(e => ({ amount: Number(e.amount) })));
   const hasActiveFilter = !!(sp.from || sp.to || sp.q || sp.tier || sp.account_code);
+
+  const ids = entries.map(e => e.id);
+  const countsRaw = ids.length ? await prisma.attachment.groupBy({ by: ['entryId'], where: { entryId: { in: ids } }, _count: { _all: true } }) : [];
+  const countMap = new Map(countsRaw.map(c => [c.entryId, c._count._all]));
 
   async function deleteEntryFormAction(formData: FormData) {
     'use server';
@@ -94,6 +100,7 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
               <th className="py-2 pr-4">Tier</th>
               <th className="py-2 pr-4">Compte</th>
               <th className="py-2 pr-4 text-right">Montant</th>
+              <th className="py-2 pr-4 text-center" title="Pièces jointes">📎</th>
               <th className="py-2 pr-2" aria-label="Actions" />
             </tr>
           </thead>
@@ -105,16 +112,22 @@ export default async function JournalAchatsPage({ searchParams }: { searchParams
                 <td className="py-1 pr-4">{e.tier}</td>
                 <td className="py-1 pr-4">{e.account_code}</td>
                 <td className="py-1 pr-4 text-right tabular-nums">{formatAmount(Number(e.amount))}</td>
+                <td className="py-1 pr-4 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <AttachmentsButton entryId={e.id} count={countMap.get(e.id) || 0} />
+                    <AttachmentsPreviewTrigger entryId={e.id} />
+                  </div>
+                </td>
                 <td className="py-1 pr-2 text-right">
                   <EditButton entry={{ id: e.id, date: e.date, designation: e.designation, tier: e.tier, account_code: e.account_code, amount: Number(e.amount) }} />
                   <form action={deleteEntryFormAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={e.id} />
-                    <button className="text-xs text-[--color-danger] hover:underline">Suppr</button>
+                    <SubmitButton className="text-xs text-[--color-danger] hover:underline" pendingLabel="Suppression…">Suppr</SubmitButton>
                   </form>
                 </td>
               </tr>
             ))}
-            {!entries.length && <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Aucune écriture</td></tr>}
+            {!entries.length && <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">Aucune écriture</td></tr>}
           </tbody>
         </table>
       </div>
