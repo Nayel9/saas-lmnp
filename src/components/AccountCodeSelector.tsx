@@ -16,8 +16,10 @@ export function AccountCodeSelector({ typeJournal, name='account_code', defaultV
   const acc = allowedList.find(a=> a.code === value);
   const allowed = !!acc && isAllowed(value, typeJournal);
   const descId = acc ? `${name}-desc` : undefined;
+  const hiddenRef = React.useRef<HTMLInputElement | null>(null);
 
   useEffect(()=> { onChange?.(value); }, [value, onChange]);
+  useEffect(()=> { if (hiddenRef.current) hiddenRef.current.value = value; }, [value]);
 
   function handleType(e: React.ChangeEvent<HTMLInputElement>) {
     const t = e.target.value.trim();
@@ -46,7 +48,8 @@ export function AccountCodeSelector({ typeJournal, name='account_code', defaultV
   useEffect(()=> { if (highlightIndex > displayList.length-1) setHighlightIndex(0); }, [displayList, highlightIndex]);
 
   return <div className="space-y-1">
-    <input type="hidden" name={name} value={value} />
+    {/* input caché non contrôlé, synchronisé par ref; permet override programmatique */}
+    <input type="hidden" name={name} defaultValue={value} ref={hiddenRef} />
     <div className="relative">
       <div className="flex gap-2">
         <div className="flex-1">
