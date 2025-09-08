@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useTransition, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { formatDateISO } from '@/lib/format';
 import { isAllowed } from '@/lib/accounting/accountsCatalog';
@@ -50,6 +51,7 @@ export default function JournalVentesClient() {
   const [isPending, startTransition] = useTransition();
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const onFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -96,6 +98,7 @@ export default function JournalVentesClient() {
       else {
         if (res.id) await uploadAll(res.id);
         setOpen(false);
+        router.refresh();
       }
     });
   }
@@ -154,6 +157,7 @@ export function EditButton({ entry }: EditButtonProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -173,7 +177,7 @@ export function EditButton({ entry }: EditButtonProps) {
     startTransition(async () => {
       const res: ActionResult = await updateEntry(fd);
       if (!res?.ok) setError(res?.error || 'Erreur inconnue');
-      else setOpen(false);
+      else { setOpen(false); router.refresh(); }
     });
   }
 

@@ -3,6 +3,7 @@ import { createPresignedPost, type PresignedPost } from '@aws-sdk/s3-presigned-p
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
 
 const TEN_MB = 10 * 1024 * 1024;
 
@@ -97,25 +98,39 @@ function localPathFor(storageKey: string) {
   return path.join(base, storageKey.replace(/^mock\//, ''));
 }
 
-export async function deleteObject(storageKey: string) {
-  const { bucket } = getS3Config();
+export async function getObjectStream(storageKey: string): Promise<Readable> {
+  // Chemin local mock: ne pas exiger la config S3
+  if (storageKey.startsWith('mock/')) {
+    const filePath = localPathFor(storageKey);
+    return fs.createReadStream(filePath);
+  }
   const client = getS3Client();
-  // local mock storage
+  const res = await client.send(new GetObjectCommand({ Bucket: getS3Config().bucket, Key: storageKey }));
+  const body = res.Body as unknown;
+  if (!body) throw new Error('STREAM_NOT_AVAILABLE');
+  const maybePipe = (body as { pipe?: unknown }).pipe;
+  if (typeof maybePipe === 'function') {
+    return body as Readable;
+  }
+  throw new Error('UNSUPPORTED_BODY_STREAM');
+}
+
+export async function deleteObject(storageKey: string) {
+  // Court-circuit mock local sans exiger la config S3
   if (storageKey.startsWith('mock/')) {
     const filePath = localPathFor(storageKey);
     try {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     } catch (err) {
-      // best-effort: log and continue
       console.warn('Failed to delete local upload', err);
     }
     return;
   }
-
+  const { bucket } = getS3Config();
+  const client = getS3Client();
   try {
     await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: storageKey }));
   } catch (err) {
-    // best-effort: log and continue
     console.warn('Failed to delete S3 object', err);
   }
 }
