@@ -12,8 +12,8 @@ import { createAsset, updateAsset } from "./actions";
 import { listFor } from "@/lib/accounting/accountsCatalog";
 import { AccountCodeSelector } from "@/components/AccountCodeSelector";
 import { toast } from "sonner";
-import { useRouter } from 'next/navigation';
-import { Spinner } from '@/components/SubmitButton';
+import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/SubmitButton";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -42,7 +42,7 @@ async function presign(assetId: string, file: File) {
     }),
   });
   if (!res.ok) {
-    await res.text().catch(()=>null);
+    await res.text().catch(() => null);
     throw new Error("Pré-signature échouée");
   }
   const data = await res.json();
@@ -72,7 +72,7 @@ async function directUpload(
     form.append("file", file);
     const up = await fetch(p.url, { method: "POST", body: form });
     if (!up.ok) {
-      await up.text().catch(()=>null);
+      await up.text().catch(() => null);
       throw new Error("Upload S3 échoué");
     }
     return;
@@ -80,7 +80,7 @@ async function directUpload(
   const headers = new Headers(p.headers || {});
   const up = await fetch(p.url, { method: "PUT", headers, body: file });
   if (!up.ok) {
-    await up.text().catch(()=>null);
+    await up.text().catch(() => null);
     throw new Error("Upload échoué");
   }
 }
@@ -98,7 +98,7 @@ async function createAttachment(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    await res.text().catch(()=>null);
+    await res.text().catch(() => null);
     throw new Error("Enregistrement pièce échoué");
   }
 }
@@ -169,7 +169,11 @@ export function AddAssetButton() {
       else {
         if (res.id) {
           await uploadAll(res.id);
-          try { router.refresh(); } catch { /* ignore */ }
+          try {
+            router.refresh();
+          } catch {
+            /* ignore */
+          }
         }
         setOpen(false);
       }

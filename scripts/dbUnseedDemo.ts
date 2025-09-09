@@ -1,15 +1,19 @@
 #!/usr/bin/env tsx
-import 'dotenv/config';
-import { prisma } from '../src/lib/prisma';
-import { SEED_SUFFIX } from '../src/lib/seedDemoCore';
+import "dotenv/config";
+
 
 const adminEmail = process.env.ADMIN_SEED_EMAIL;
 
 function assertEnv() {
   const missing: string[] = [];
-  if (!adminEmail) missing.push('ADMIN_SEED_EMAIL');
-  if (missing.length) { console.error('Variables manquantes:', missing.join(', ')); process.exit(1); }
+  if (!adminEmail) missing.push("ADMIN_SEED_EMAIL");
+  if (missing.length) {
+    console.error("Variables manquantes:", missing.join(", "));
+    process.exit(1);
+  }
 }
 
 // Ici, tu peux ajouter la logique de suppression sans Supabase, ou supprimer ce script si inutile.
-console.log('Ce script nécessite une adaptation ou peut être supprimé si Supabase n’est plus utilisé.');
+console.log(
+  "Ce script nécessite une adaptation ou peut être supprimé si Supabase n’est plus utilisé.",
+);

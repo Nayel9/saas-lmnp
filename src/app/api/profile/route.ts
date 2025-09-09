@@ -17,12 +17,15 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const limited = ensureRateLimit(req, 'profile-update', { capacity: 5 });
+  const limited = ensureRateLimit(req, "profile-update", { capacity: 5 });
   if (limited) return limited;
 
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
 
   const body = await req.json().catch(() => null);
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: "VALIDATION", details: parsed.error.flatten() },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

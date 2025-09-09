@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TWSpinner from "@/components/ui/loader/spinner";
 import { toast } from "sonner";
+import LmnpBanner from "@/components/synthesis/LmnpBanner";
 
 type PropertyOpt = { id: string; label: string };
 
@@ -64,6 +65,7 @@ export default function IncomeStatementClient({
 
   useEffect(() => {
     async function load() {
+
       if (!propertyId) {
         setData(null);
         return;
@@ -212,6 +214,9 @@ export default function IncomeStatementClient({
           Exporter CSV
         </button>
       </div>
+
+      {/* Bannière LMNP (au-dessus du compte de résultat) */}
+      <LmnpBanner propertyId={propertyId} year={year} totals={data} />
 
       <section className="card p-4">
         <h2 className="font-semibold mb-3">Compte de résultat (simple)</h2>

@@ -12,19 +12,29 @@
  *  FORCE_BUILD=1       Force la reconstruction.
  *  PREVIEW_VERBOSE=1   Log détaillé.
  */
-const { spawnSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
+const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const root = process.cwd();
-const verbose = process.env.PREVIEW_VERBOSE === '1';
-const force = process.env.FORCE_BUILD === '1';
+const verbose = process.env.PREVIEW_VERBOSE === "1";
+const force = process.env.FORCE_BUILD === "1";
 
-function log(msg) { console.log(msg); }
-function info(msg) { console.log(`\x1b[36m[i]\x1b[0m ${msg}`); }
-function warn(msg) { console.warn(`\x1b[33m[!]\x1b[0m ${msg}`); }
-function success(msg) { console.log(`\x1b[32m[✓]\x1b[0m ${msg}`); }
-function error(msg) { console.error(`\x1b[31m[✗]\x1b[0m ${msg}`); }
+function log(msg) {
+  console.log(msg);
+}
+function info(msg) {
+  console.log(`\x1b[36m[i]\x1b[0m ${msg}`);
+}
+function warn(msg) {
+  console.warn(`\x1b[33m[!]\x1b[0m ${msg}`);
+}
+function success(msg) {
+  console.log(`\x1b[32m[✓]\x1b[0m ${msg}`);
+}
+function error(msg) {
+  console.error(`\x1b[31m[✗]\x1b[0m ${msg}`);
+}
 
 function newestMtime(targetPath) {
   let newest = 0;
@@ -42,59 +52,72 @@ function newestMtime(targetPath) {
         const sub = fs.readdirSync(p).slice(0, 200);
         for (const subE of sub) {
           const sp = path.join(p, subE);
-          try { const ss = fs.statSync(sp); if (ss.mtimeMs > newest) newest = ss.mtimeMs; } catch {/* ignore */}
+          try {
+            const ss = fs.statSync(sp);
+            if (ss.mtimeMs > newest) newest = ss.mtimeMs;
+          } catch {
+            /* ignore */
+          }
         }
       } else {
         if (s.mtimeMs > newest) newest = s.mtimeMs;
       }
-    } catch {/* ignore */}
+    } catch {
+      /* ignore */
+    }
   }
   return newest;
 }
 
 function collectSourcesMtime() {
   const candidates = [
-    'src',
-    'prisma/schema.prisma',
-    'package.json',
-    'next.config.ts',
-    'tailwind.config.ts',
-    'eslint.config.mjs'
+    "src",
+    "prisma/schema.prisma",
+    "package.json",
+    "next.config.ts",
+    "tailwind.config.ts",
+    "eslint.config.mjs",
   ];
   let newest = 0;
   for (const c of candidates) {
     const p = path.join(root, c);
     const m = newestMtime(p);
     if (m > newest) newest = m;
-    if (verbose) info(`mtime ${c}: ${m || 'n/a'}`);
+    if (verbose) info(`mtime ${c}: ${m || "n/a"}`);
   }
   return newest;
 }
 
 function build() {
-  info('Lancement build (pnpm build)...');
-  const r = spawnSync('pnpm', ['build'], { stdio: 'inherit', shell: process.platform === 'win32' });
+  info("Lancement build (pnpm build)...");
+  const r = spawnSync("pnpm", ["build"], {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
   if (r.status !== 0) {
-    error('Build échouée');
+    error("Build échouée");
     process.exit(r.status || 1);
   }
-  success('Build terminée');
+  success("Build terminée");
 }
 
 function start() {
-  info('Démarrage (pnpm start)...');
-  const r = spawnSync('pnpm', ['start'], { stdio: 'inherit', shell: process.platform === 'win32' });
+  info("Démarrage (pnpm start)...");
+  const r = spawnSync("pnpm", ["start"], {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
   process.exit(r.status || 0);
 }
 
 (function main() {
-  const buildIdPath = path.join(root, '.next', 'BUILD_ID');
+  const buildIdPath = path.join(root, ".next", "BUILD_ID");
   let needBuild = false;
   if (force) {
-    info('FORCE_BUILD=1 -> rebuild forcé');
+    info("FORCE_BUILD=1 -> rebuild forcé");
     needBuild = true;
   } else if (!fs.existsSync(buildIdPath)) {
-    info('Pas de build existante détectée');
+    info("Pas de build existante détectée");
     needBuild = true;
   } else {
     const buildStat = fs.statSync(buildIdPath);
@@ -102,13 +125,12 @@ function start() {
     const sourcesMtime = collectSourcesMtime();
     if (verbose) info(`mtime build: ${buildMtime}`);
     if (sourcesMtime > buildMtime) {
-      info('Sources plus récentes que la build');
+      info("Sources plus récentes que la build");
       needBuild = true;
     } else {
-      success('Build à jour (aucune reconstruction)');
+      success("Build à jour (aucune reconstruction)");
     }
   }
   if (needBuild) build();
   start();
 })();
-

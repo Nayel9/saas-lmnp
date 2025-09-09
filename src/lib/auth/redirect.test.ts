@@ -6,7 +6,7 @@ const redirect = authOptions.callbacks!.redirect!;
 describe("NextAuth redirect callback (sécurité)", () => {
   it("accepte une URL relative", async () => {
     const baseUrl = "http://localhost:3000";
-    const res = await redirect({ url: "/dashboard", baseUrl, } as {
+    const res = await redirect({ url: "/dashboard", baseUrl } as {
       url: string;
       baseUrl: string;
     });

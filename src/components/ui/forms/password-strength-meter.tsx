@@ -1,32 +1,32 @@
-'use client'
+"use client";
 
-import React from 'react'
+import React from "react";
 
 type Props = {
-  password: string
-  className?: string
-}
+  password: string;
+  className?: string;
+};
 
 export function PasswordStrengthMeter({ password, className }: Props) {
   const getStrength = (password: string) => {
-    let score = 0
+    let score = 0;
 
-    if (password.length >= 8) score++
-    if (/[A-Z]/.test(password)) score++
-    if (/[a-z]/.test(password)) score++
-    if (/\d/.test(password)) score++
-    if (/[^A-Za-z0-9]/.test(password)) score++
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
 
-    return score
-  }
+    return score;
+  };
 
-  const strength = getStrength(password)
-  const percent = (strength / 5) * 100
+  const strength = getStrength(password);
+  const percent = (strength / 5) * 100;
   const getColor = () => {
-    if (percent < 40) return 'bg-red-500'
-    if (percent < 80) return 'bg-yellow-500'
-    return 'bg-green-500'
-  }
+    if (percent < 40) return "bg-red-500";
+    if (percent < 80) return "bg-yellow-500";
+    return "bg-green-500";
+  };
 
   return (
     <div className="mt-1">
@@ -37,11 +37,11 @@ export function PasswordStrengthMeter({ password, className }: Props) {
         ></div>
       </div>
       <p className="text-xs mt-1 text-muted-foreground">
-        Robustesse :{' '}
+        Robustesse :{" "}
         <strong>
-          {strength <= 1 ? 'Très faible' : strength <= 3 ? 'Moyenne' : 'Forte'}
+          {strength <= 1 ? "Très faible" : strength <= 3 ? "Moyenne" : "Forte"}
         </strong>
       </p>
     </div>
-  )
+  );
 }

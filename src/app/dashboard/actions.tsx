@@ -1,6 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
-import { auth } from '@/lib/auth/core';
+import { auth } from "@/lib/auth/core";
 import { prisma } from "@/lib/prisma";
 
 export async function createProperty(formData: FormData) {

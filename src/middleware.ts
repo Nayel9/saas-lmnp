@@ -18,7 +18,9 @@ export async function middleware(request: NextRequest) {
   if (isExcluded) return NextResponse.next();
 
   const session = await auth();
-  const user = session?.user as { role?: string; needsProfile?: boolean; isSso?: boolean } | undefined;
+  const user = session?.user as
+    | { role?: string; needsProfile?: boolean; isSso?: boolean }
+    | undefined;
 
   // 1) Redirection onboarding seulement pour SSO si profil incomplet
   if (user?.isSso && user?.needsProfile) {
@@ -27,11 +29,18 @@ export async function middleware(request: NextRequest) {
   }
 
   // 2) Tes règles d’accès existantes
-  if (path.startsWith("/dashboard") || path.startsWith("/admin") || path.startsWith("/reports")) {
+  if (
+    path.startsWith("/dashboard") ||
+    path.startsWith("/admin") ||
+    path.startsWith("/reports")
+  ) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    if ((path.startsWith("/admin") || path.startsWith("/reports")) && getUserRole(user) !== "admin") {
+    if (
+      (path.startsWith("/admin") || path.startsWith("/reports")) &&
+      getUserRole(user) !== "admin"
+    ) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

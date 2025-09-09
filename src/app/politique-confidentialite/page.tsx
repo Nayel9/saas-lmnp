@@ -1,4 +1,4 @@
-export const metadata = { title: 'Politique de confidentialité' };
+export const metadata = { title: "Politique de confidentialité" };
 export default function PolitiqueConfidentialitePage() {
   return (
     <main className="prose max-w-3xl mx-auto p-6">
@@ -7,4 +7,3 @@ export default function PolitiqueConfidentialitePage() {
     </main>
   );
 }
-

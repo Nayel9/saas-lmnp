@@ -30,7 +30,9 @@ export default function OnboardingProfilePage() {
     lastName: user?.lastName ?? "",
     phone: user?.phone ?? "",
   });
-  const [errors, setErrors] = React.useState<{ [k: string]: string | undefined }>({});
+  const [errors, setErrors] = React.useState<{
+    [k: string]: string | undefined;
+  }>({});
   const [loading, setLoading] = React.useState(false);
 
   // Si l'utilisateur est authentifié et que le profil est déjà complet → dashboard
@@ -115,11 +117,15 @@ export default function OnboardingProfilePage() {
             <Input
               id="firstName"
               value={form.firstName}
-              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, firstName: e.target.value }))
+              }
               className={errors.firstName ? "!border-red-500" : ""}
               autoComplete="given-name"
             />
-            {errors.firstName && <p className="text-[11px] text-red-600">{errors.firstName}</p>}
+            {errors.firstName && (
+              <p className="text-[11px] text-red-600">{errors.firstName}</p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -127,11 +133,15 @@ export default function OnboardingProfilePage() {
             <Input
               id="lastName"
               value={form.lastName}
-              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, lastName: e.target.value }))
+              }
               className={errors.lastName ? "!border-red-500" : ""}
               autoComplete="family-name"
             />
-            {errors.lastName && <p className="text-[11px] text-red-600">{errors.lastName}</p>}
+            {errors.lastName && (
+              <p className="text-[11px] text-red-600">{errors.lastName}</p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -139,15 +149,23 @@ export default function OnboardingProfilePage() {
             <Input
               id="phone"
               value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, phone: e.target.value }))
+              }
               className={errors.phone ? "!border-red-500" : ""}
               placeholder="+33 ..."
               autoComplete="tel"
             />
-            {errors.phone && <p className="text-[11px] text-red-600">{errors.phone}</p>}
+            {errors.phone && (
+              <p className="text-[11px] text-red-600">{errors.phone}</p>
+            )}
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full"
+          >
             {loading ? "Enregistrement…" : "Enregistrer et continuer"}
           </button>
         </form>

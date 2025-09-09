@@ -4,7 +4,9 @@ export interface AmortizationYear {
   cumul: number; // amortissement cumulé après cette année
 }
 
-function round2(n: number): number { return Math.round(n * 100) / 100; }
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 /**
  * Calcule un tableau d'amortissement linéaire avec prorata temporis (mois) la 1ère année.
@@ -13,9 +15,14 @@ function round2(n: number): number { return Math.round(n * 100) / 100; }
  * - années intermédiaires: annual
  * - dernière année: ajustement pour atteindre exactement le montant (correction des arrondis)
  */
-export function computeLinearAmortization(amount: number, durationYears: number, acquisitionDate: Date): AmortizationYear[] {
-  if (amount <= 0) throw new Error('Montant doit être > 0');
-  if (!Number.isInteger(durationYears) || durationYears <= 0) throw new Error('Durée invalide');
+export function computeLinearAmortization(
+  amount: number,
+  durationYears: number,
+  acquisitionDate: Date,
+): AmortizationYear[] {
+  if (amount <= 0) throw new Error("Montant doit être > 0");
+  if (!Number.isInteger(durationYears) || durationYears <= 0)
+    throw new Error("Durée invalide");
   const schedule: AmortizationYear[] = [];
   const annual = amount / durationYears;
   const monthsFirst = 12 - acquisitionDate.getMonth();
@@ -37,15 +44,21 @@ export function computeLinearAmortization(amount: number, durationYears: number,
   }
   const diff = round2(amount - schedule[schedule.length - 1].cumul);
   if (Math.abs(diff) >= 0.01) {
-    schedule[schedule.length - 1].dotation = round2(schedule[schedule.length - 1].dotation + diff);
+    schedule[schedule.length - 1].dotation = round2(
+      schedule[schedule.length - 1].dotation + diff,
+    );
     const prev = schedule[schedule.length - 2]?.cumul || 0;
-    schedule[schedule.length - 1].cumul = round2(prev + schedule[schedule.length - 1].dotation);
+    schedule[schedule.length - 1].cumul = round2(
+      prev + schedule[schedule.length - 1].dotation,
+    );
   }
   return schedule;
 }
 
 export function amortizationToCsv(rows: AmortizationYear[]): string {
-  const header = 'annee;dotation;cumul\n';
-  const body = rows.map(r => `${r.year};${r.dotation.toFixed(2)};${r.cumul.toFixed(2)}`).join('\n');
-  return header + body + (body ? '\n' : '');
+  const header = "annee;dotation;cumul\n";
+  const body = rows
+    .map((r) => `${r.year};${r.dotation.toFixed(2)};${r.cumul.toFixed(2)}`)
+    .join("\n");
+  return header + body + (body ? "\n" : "");
 }
