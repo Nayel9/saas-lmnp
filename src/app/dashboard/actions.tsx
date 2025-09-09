@@ -17,3 +17,35 @@ export async function createProperty(formData: FormData) {
   });
   redirect("/dashboard");
 }
+
+export interface PostMonthlyAmortInput {
+  propertyId: string;
+  year: number;
+  month: number; // 1..12
+}
+
+export async function postMonthlyAmortization(input: PostMonthlyAmortInput) {
+  const session = await auth();
+  const user = session?.user;
+  if (!user) throw new Error("Non authentifié");
+  const { propertyId, year, month } = input;
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== user.id) throw new Error("FORBIDDEN");
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+  const exists = await prisma.amortization.findFirst({
+    where: { user_id: user.id, propertyId, year, note: { contains: `month:${monthKey}` } },
+    select: { id: true },
+  });
+  if (exists) return { created: false, id: exists.id };
+  const created = await prisma.amortization.create({
+    data: {
+      user_id: user.id,
+      propertyId,
+      year,
+      amount: 0,
+      note: `month:${monthKey}`,
+    },
+    select: { id: true },
+  });
+  return { created: true, id: created.id };
+}

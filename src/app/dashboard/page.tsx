@@ -4,6 +4,8 @@ import { getUserRole } from "@/lib/auth";
 import Link from "next/link";
 import { createProperty } from "./actions";
 import { getDepositsSummary } from "@/lib/deposits";
+import { prisma } from "@/lib/prisma";
+import DashboardMonthlyClient from "./monthly-client";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +25,18 @@ export default async function DashboardPage() {
     to: new Date(),
   });
 
+  const properties = await prisma.property.findMany({
+    where: { user_id: user.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, label: true },
+  });
+
   return (
     <main className="min-h-screen p-8 space-y-8 max-w-5xl mx-auto">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Tableau de bord
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
         <p className="text-muted-foreground text-sm">
-          Connecté en tant que{" "}
-          <span className="font-medium">{displayName}</span>
+          Connecté en tant que <span className="font-medium">{displayName}</span>
         </p>
         {role === "admin" && (
           <p className="text-xs text-muted-foreground">
@@ -41,18 +46,21 @@ export default async function DashboardPage() {
           </p>
         )}
       </header>
+
+      {/* Cartes clés (mois) */}
+      <section className="card p-4 space-y-4">
+        <h2 className="text-lg font-medium">Cartes clés (mois)</h2>
+        <DashboardMonthlyClient properties={properties} />
+      </section>
+
       {/* Banner profil incomplet (SSO uniquement) */}
       {user?.isSso && user?.needsProfile && (
         <div className="rounded-[var(--radius)] p-4 border border-border bg-blue-100 text-blue-800">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm">
-              Votre profil est incomplet. Merci de renseigner votre prénom, nom
-              et téléphone.
+              Votre profil est incomplet. Merci de renseigner votre prénom, nom et téléphone.
             </p>
-            <a
-              href="/onboarding/profile"
-              className="btn-ghost whitespace-nowrap"
-            >
+            <a href="/onboarding/profile" className="btn-ghost whitespace-nowrap">
               Compléter maintenant
             </a>
           </div>
@@ -63,18 +71,8 @@ export default async function DashboardPage() {
         <div className="card space-y-4">
           <h2 className="text-lg font-medium">Nouveau bien</h2>
           <form action={createProperty} className="space-y-3">
-            <input
-              name="label"
-              placeholder="Nom du bien"
-              className="input"
-              autoComplete="off"
-            />
-            <input
-              name="address"
-              placeholder="Adresse (optionnel)"
-              className="input"
-              autoComplete="off"
-            />
+            <input name="label" placeholder="Nom du bien" className="input" autoComplete="off" />
+            <input name="address" placeholder="Adresse (optionnel)" className="input" autoComplete="off" />
             <div className="pt-1">
               <button className="btn-primary w-full">Ajouter</button>
             </div>
@@ -87,10 +85,7 @@ export default async function DashboardPage() {
             <li>Amortissements</li>
             <li>Exports fiscaux</li>
             <li>
-              <span className="text-foreground font-medium">
-                Cautions en cours
-              </span>
-              : {deposits.sum.toFixed(2)} EUR ({deposits.count})
+              <span className="text-foreground font-medium">Cautions en cours</span>: {deposits.sum.toFixed(2)} EUR ({deposits.count})
             </li>
           </ul>
         </div>
