@@ -13,7 +13,7 @@ vi.mock('@/lib/prisma', () => {
     if (id === P2) return { id: P2, user_id: 'other' };
     return null;
   }) };
-  const journalEntry = { findMany: vi.fn(async (_args: unknown) => {
+  const journalEntry = { findMany: vi.fn(async () => {
     // Jeu fixe pour 2025
     return [
       { type: 'vente', amount: 1000, isDeposit: false, account_code: '706', date: new Date('2025-03-10') },
