@@ -1,7 +1,7 @@
-import { auth } from '@/lib/auth/core';
-import { Landing } from '@/components/marketing/Landing';
+import { auth } from "@/lib/auth/core";
+import { Landing } from "@/components/marketing/Landing";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const session = await auth();

@@ -1,5 +1,5 @@
-import '@testing-library/jest-dom/vitest';
-import { beforeAll, afterAll, vi } from 'vitest';
+import "@testing-library/jest-dom/vitest";
+import { beforeAll, afterAll, vi } from "vitest";
 
 beforeAll(() => {
   if (!window.matchMedia) {
@@ -12,7 +12,7 @@ beforeAll(() => {
       removeListener: () => {},
       addEventListener: () => {},
       removeEventListener: () => {},
-      dispatchEvent: () => false
+      dispatchEvent: () => false,
     });
   }
 });

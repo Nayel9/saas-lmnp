@@ -7,14 +7,15 @@ export interface LedgerEntry {
   credit: number;
 }
 
-export interface LedgerLine extends LedgerEntry { balance: number; }
+export interface LedgerLine extends LedgerEntry {
+  balance: number;
+}
 
 /** Calcule le solde cumulatif ligne par ligne. */
 export function computeLedger(lines: LedgerEntry[]): LedgerLine[] {
   let running = 0;
-  return lines.map(l => {
+  return lines.map((l) => {
     running += l.debit - l.credit;
     return { ...l, balance: running };
   });
 }
-

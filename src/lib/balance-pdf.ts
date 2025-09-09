@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from "pdf-lib";
 
 export interface BalancePdfRow {
   account_code: string;
@@ -22,18 +22,35 @@ const TOP = 40;
 const BOTTOM = 40;
 const LINE_HEIGHT = 14;
 
-function asciiSafe(s: string): string { return s.replace(/\u2192/g, '->'); }
-function truncate(s: string, max: number) { return s.length > max ? s.slice(0, max - 1) + '…' : s; }
+function asciiSafe(s: string): string {
+  return s.replace(/\u2192/g, "->");
+}
+function truncate(s: string, max: number) {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
 
-export async function generateBalancePdf(opts: BalancePdfOptions): Promise<Uint8Array> {
-  const { title = 'Balance des comptes', rows, period, filters = {}, truncateAt = 5000 } = opts;
+export async function generateBalancePdf(
+  opts: BalancePdfOptions,
+): Promise<Uint8Array> {
+  const {
+    title = "Balance des comptes",
+    rows,
+    period,
+    filters = {},
+    truncateAt = 5000,
+  } = opts;
   const totalDebit = rows.reduce((a, r) => a + r.total_debit, 0);
   const totalCredit = rows.reduce((a, r) => a + r.total_credit, 0);
   const totalBalance = totalDebit - totalCredit;
 
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const colX = { acc: LEFT, debit: LEFT + 160, credit: LEFT + 280, bal: LEFT + 400 };
+  const colX = {
+    acc: LEFT,
+    debit: LEFT + 160,
+    credit: LEFT + 280,
+    bal: LEFT + 400,
+  };
 
   let page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
   page.setFont(font);
@@ -45,25 +62,39 @@ export async function generateBalancePdf(opts: BalancePdfOptions): Promise<Uint8
 
   const writeHeader = () => {
     y = A4_HEIGHT - TOP;
-    drawText(title, LEFT, y, 16); y -= LINE_HEIGHT * 1.5;
-    drawText(`Période: ${period.from || '—'} -> ${period.to || '—'}`, LEFT, y, 9); y -= LINE_HEIGHT;
+    drawText(title, LEFT, y, 16);
+    y -= LINE_HEIGHT * 1.5;
+    drawText(
+      `Période: ${period.from || "—"} -> ${period.to || "—"}`,
+      LEFT,
+      y,
+      9,
+    );
+    y -= LINE_HEIGHT;
     const fParts: string[] = [];
     if (filters.account_code) fParts.push(`compte~${filters.account_code}`);
     if (filters.q) fParts.push(`q=${filters.q}`);
-    if (fParts.length) { drawText('Filtres: ' + fParts.join(', '), LEFT, y, 9); y -= LINE_HEIGHT; }
+    if (fParts.length) {
+      drawText("Filtres: " + fParts.join(", "), LEFT, y, 9);
+      y -= LINE_HEIGHT;
+    }
     // colonnes
-    const headerY = y; y -= LINE_HEIGHT;
-    drawText('Compte', colX.acc, headerY, 10);
-    drawText('Total Débit', colX.debit, headerY, 10);
-    drawText('Total Crédit', colX.credit, headerY, 10);
-    drawText('Solde', colX.bal, headerY, 10);
+    const headerY = y;
+    y -= LINE_HEIGHT;
+    drawText("Compte", colX.acc, headerY, 10);
+    drawText("Total Débit", colX.debit, headerY, 10);
+    drawText("Total Crédit", colX.credit, headerY, 10);
+    drawText("Solde", colX.bal, headerY, 10);
   };
 
   writeHeader();
   const maxY = BOTTOM + 60; // réserve pied
   let lineCount = 0;
   for (const r of rows) {
-    if (lineCount >= truncateAt) { drawText('… (troncation)', LEFT, y, 9); break; }
+    if (lineCount >= truncateAt) {
+      drawText("… (troncation)", LEFT, y, 9);
+      break;
+    }
     if (y <= maxY) {
       page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
       page.setFont(font);
@@ -84,8 +115,12 @@ export async function generateBalancePdf(opts: BalancePdfOptions): Promise<Uint8
     y -= LINE_HEIGHT;
   }
   y -= LINE_HEIGHT;
-  drawText(`Totaux généraux  Débit: ${totalDebit.toFixed(2)}  Crédit: ${totalCredit.toFixed(2)}  Solde: ${(totalBalance).toFixed(2)}` , LEFT, y, 10);
+  drawText(
+    `Totaux généraux  Débit: ${totalDebit.toFixed(2)}  Crédit: ${totalCredit.toFixed(2)}  Solde: ${totalBalance.toFixed(2)}`,
+    LEFT,
+    y,
+    10,
+  );
 
   return await pdfDoc.save();
 }
-

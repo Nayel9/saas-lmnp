@@ -1,4 +1,4 @@
-export const metadata = { title: 'Conditions Générales de Vente' };
+export const metadata = { title: "Conditions Générales de Vente" };
 export default function CGVPage() {
   return (
     <main className="prose max-w-3xl mx-auto p-6">
@@ -7,4 +7,3 @@ export default function CGVPage() {
     </main>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 import React, { useCallback, useRef, useState, useTransition } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { formatDateISO } from "@/lib/format";
 import { isAllowed } from "@/lib/accounting/accountsCatalog";
@@ -243,7 +243,10 @@ export default function JournalAchatsClient() {
                 >
                   Annuler
                 </button>
-                <button disabled={isPending} className="btn-primary inline-flex items-center gap-2">
+                <button
+                  disabled={isPending}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
                   {isPending && <Spinner />}
                   {isPending ? "Enregistrement..." : "Enregistrer"}
                 </button>
@@ -299,7 +302,10 @@ export function EditButton({ entry }: EditButtonProps) {
     startTransition(async () => {
       const res: ActionResult = await updateEntry(fd);
       if (!res?.ok) setError(res?.error || "Erreur inconnue");
-      else { setOpen(false); router.refresh(); }
+      else {
+        setOpen(false);
+        router.refresh();
+      }
     });
   }
 
@@ -352,7 +358,10 @@ export function EditButton({ entry }: EditButtonProps) {
                 >
                   Annuler
                 </button>
-                <button disabled={isPending} className="btn-primary inline-flex items-center gap-2">
+                <button
+                  disabled={isPending}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
                   {isPending && <Spinner />}
                   {isPending ? "Sauvegarde..." : "Mettre à jour"}
                 </button>

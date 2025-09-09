@@ -14,118 +14,137 @@
     "rubrique": "Trésorerie"
   },
 
-  { "code": "606",
+  {
+    "code": "606",
     "label": "Achats non stockés de matières et fournitures",
     "description": "Fournitures, petits matériels, consommables",
     "appliesTo": ["achat"],
     "rubrique": "ChargesExternes"
   },
-  { "code": "6063",
+  {
+    "code": "6063",
     "label": "Petit matériel et outillage",
     "description": "Matériel de faible valeur non immobilisé",
     "appliesTo": ["achat"],
     "rubrique": "ChargesExternes"
   },
-  { "code": "613",
+  {
+    "code": "613",
     "label": "Locations",
     "description": "Charges locatives et loyers (ex. emplacement camping)",
     "appliesTo": ["achat"],
     "rubrique": "ChargesExternes"
   },
-  { "code": "615",
+  {
+    "code": "615",
     "label": "Entretien et réparations",
     "description": "Maintenance, réparations, entretien du bien ou mobilier",
     "appliesTo": ["achat"],
     "rubrique": "ChargesExternes"
   },
-  { "code": "616",
+  {
+    "code": "616",
     "label": "Primes d’assurances",
     "description": "Assurances habitation, responsabilité civile, etc.",
     "appliesTo": ["achat"],
     "rubrique": "Assurances"
   },
-  { "code": "618",
+  {
+    "code": "618",
     "label": "Divers (documentation, frais de formation)",
     "description": "Petits frais annexes (documentation, logiciels simples)",
     "appliesTo": ["achat"],
     "rubrique": "ServicesExterieurs"
   },
-  { "code": "62",
+  {
+    "code": "62",
     "label": "Autres services extérieurs",
     "description": "Honoraires, frais bancaires, prestataires",
     "appliesTo": ["achat"],
     "rubrique": "ServicesExterieurs"
   },
-  { "code": "627",
+  {
+    "code": "627",
     "label": "Services bancaires",
     "description": "Frais bancaires divers",
     "appliesTo": ["achat"],
     "rubrique": "ServicesExterieurs"
   },
-  { "code": "635",
+  {
+    "code": "635",
     "label": "Impôts, taxes et versements assimilés",
     "description": "Taxe foncière, CFE, autres impôts hors impôt sur le revenu",
     "appliesTo": ["achat"],
     "rubrique": "ImpotsTaxes"
   },
 
-  { "code": "6811",
+  {
+    "code": "6811",
     "label": "Dotations aux amortissements sur immobilisations incorporelles et corporelles",
     "description": "Amortissements des biens et mobilier",
     "appliesTo": ["achat"],
     "rubrique": "Dotations"
   },
 
-  { "code": "706",
+  {
+    "code": "706",
     "label": "Prestations de services (loyers)",
     "description": "Recettes locatives (loyers perçus, charges refacturées)",
     "appliesTo": ["vente"],
     "rubrique": "CA"
   },
-  { "code": "707",
+  {
+    "code": "707",
     "label": "Ventes de marchandises",
     "description": "Utilisé si fourniture accessoire (ex. petits déjeuners, linge vendu…)",
     "appliesTo": ["vente"],
     "rubrique": "CA"
   },
-  { "code": "708",
+  {
+    "code": "708",
     "label": "Produits des activités annexes",
     "description": "Recettes accessoires (ex. services facturés au locataire)",
     "appliesTo": ["vente"],
     "rubrique": "CA"
   },
-  { "code": "709",
+  {
+    "code": "709",
     "label": "Rabais, remises et ristournes accordés par l’entreprise",
     "description": "Réductions de loyers ou remises accordées",
     "appliesTo": ["vente"],
     "rubrique": "CA_Moins"
   },
 
-  { "code": "205",
+  {
+    "code": "205",
     "label": "Logiciels",
     "description": "Immobilisations incorporelles - logiciels acquis",
     "appliesTo": ["asset"],
     "rubrique": "Immobilisations"
   },
-  { "code": "2135",
+  {
+    "code": "2135",
     "label": "Agencements",
     "description": "Agencements et aménagements",
     "appliesTo": ["asset"],
     "rubrique": "Immobilisations"
   },
-  { "code": "2155",
+  {
+    "code": "2155",
     "label": "Matériel",
     "description": "Matériel technique et industriel",
     "appliesTo": ["asset"],
     "rubrique": "Immobilisations"
   },
-  { "code": "2183",
+  {
+    "code": "2183",
     "label": "Mobilier",
     "description": "Mobilier et matériel de bureau",
     "appliesTo": ["asset"],
     "rubrique": "Immobilisations"
   },
-  { "code": "2184",
+  {
+    "code": "2184",
     "label": "Matériel info/bureau",
     "description": "Matériel informatique et de bureau",
     "appliesTo": ["asset"],

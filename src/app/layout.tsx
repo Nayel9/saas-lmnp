@@ -15,28 +15,32 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.ico" },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const titleValue = typeof metadata.title === "string" ? metadata.title : "";
 
   return (
     <html lang="fr" className="scroll-smooth">
-    <head>
-      <meta name="description" content={metadata.description ?? undefined} />
-      <title>{titleValue}</title>
-    </head>
-    <body className="min-h-screen flex flex-col">
-    <a
-      href="#main"
-      className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-brand focus:text-[--color-brand-foreground] focus:px-4 focus:py-2 focus:rounded-md shadow"
-    >
-      Aller au contenu
-    </a>
-    <Providers>
-      <NavBar />
-      <div className="flex-1">{children}</div>
-      <Toaster />
-    </Providers>
-    </body>
+      <head>
+        <meta name="description" content={metadata.description ?? undefined} />
+        <title>{titleValue}</title>
+      </head>
+      <body className="min-h-screen flex flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-brand focus:text-[--color-brand-foreground] focus:px-4 focus:py-2 focus:rounded-md shadow"
+        >
+          Aller au contenu
+        </a>
+        <Providers>
+          <NavBar />
+          <div className="flex-1">{children}</div>
+          <Toaster />
+        </Providers>
+      </body>
     </html>
   );
 }

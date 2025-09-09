@@ -1,25 +1,37 @@
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import SignupVerifyModal from './SignupVerifyModal';
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import SignupVerifyModal from "./SignupVerifyModal";
 
 // Mock router
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
-describe('SignupVerifyModal', () => {
-  const email = 'test@example.com';
+describe("SignupVerifyModal", () => {
+  const email = "test@example.com";
 
-  it('affiche email, loader, bouton renvoi', () => {
+  it("affiche email, loader, bouton renvoi", () => {
     render(<SignupVerifyModal opened email={email} onClose={() => {}} />);
     expect(screen.getByText(/Vérifiez vos emails/)).toBeInTheDocument();
     expect(screen.getByText(email)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Renvoyer l'email/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Renvoyer l'email/i }),
+    ).toBeInTheDocument();
   });
 
-  it('déclenche fetch et cooldown après clic renvoi', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ success: true }) } as unknown as Response);
-    render(<SignupVerifyModal opened email={email} onClose={() => {}} enablePolling={false} />);
-    const btn = screen.getAllByTestId('resend-btn')[0];
+  it("déclenche fetch et cooldown après clic renvoi", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as unknown as Response);
+    render(
+      <SignupVerifyModal
+        opened
+        email={email}
+        onClose={() => {}}
+        enablePolling={false}
+      />,
+    );
+    const btn = screen.getAllByTestId("resend-btn")[0];
     btn.click();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(btn).toBeDisabled();
