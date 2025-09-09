@@ -53,6 +53,7 @@ export function NavBar() {
           {user && <Link href="/journal/achats" aria-current={pathname==='/journal/achats'? 'page':undefined} className={linkClass('/journal/achats')}>Journal Achats</Link>}
             {user && <Link href="/journal/ventes" aria-current={pathname==='/journal/ventes'? 'page':undefined} className={linkClass('/journal/ventes')}>Journal Ventes</Link>}
           {user && <Link href="/assets" aria-current={pathname==='/assets'? 'page':undefined} className={linkClass('/assets')}>Immobilisations</Link>}
+          {user && <Link href="/synthesis" aria-current={pathname==='/synthesis'? 'page':undefined} className={linkClass('/synthesis')}>Synthèse</Link>}
           {user && role === 'admin' && <Link href="/admin" aria-current={pathname==='/admin'? 'page':undefined} className={linkClass('/admin')}>Admin</Link>}
           {user && role === 'admin' && <Link href="/reports/balance" aria-current={pathname==='/reports/balance'? 'page':undefined} className={linkClass('/reports/balance')}>Balance</Link>}
         </div>
