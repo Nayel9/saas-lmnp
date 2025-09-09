@@ -29,6 +29,9 @@ export default function BalanceClient({
   const [propertyId, setPropertyId] = useState<string>(
     search.get("property") || properties[0]?.id || "",
   );
+  const [scope, setScope] = useState<"user" | "property">(
+    search.get("scope") === "property" ? "property" : "user",
+  );
   const [year, setYear] = useState<number>(() =>
     parseInt(search.get("year") || String(defaultYear), 10),
   );
@@ -53,9 +56,10 @@ export default function BalanceClient({
     const p = new URLSearchParams();
     if (propertyId) p.set("property", propertyId);
     if (year) p.set("year", String(year));
+    if (scope) p.set("scope", scope);
     p.set("tab", "balance");
     return p.toString();
-  }, [propertyId, year]);
+  }, [propertyId, year, scope]);
 
   useEffect(() => {
     const url = `/synthesis${q ? `?${q}` : ""}`;
@@ -72,7 +76,7 @@ export default function BalanceClient({
       setError(null);
       try {
         const res = await fetch(
-          `/api/synthesis/balance?property=${encodeURIComponent(propertyId)}&year=${year}`,
+          `/api/synthesis/balance?property=${encodeURIComponent(propertyId)}&year=${year}&scope=${scope}`,
           { cache: "no-store" },
         );
         if (!res.ok) {
@@ -92,11 +96,23 @@ export default function BalanceClient({
       }
     }
     load();
-  }, [propertyId, year]);
+  }, [propertyId, year, scope]);
 
   return (
     <div className="space-y-4">
-      <form className="grid sm:grid-cols-3 gap-3 items-end">
+      <form className="grid sm:grid-cols-4 gap-3 items-end">
+        <label className="space-y-1">
+          <div className="text-sm font-medium">Portée</div>
+          <select
+            aria-label="Portée"
+            value={scope}
+            onChange={(e) => setScope(e.target.value === "property" ? "property" : "user")}
+            className="input w-full"
+          >
+            <option value="user">Utilisateur (tous biens)</option>
+            <option value="property">Bien</option>
+          </select>
+        </label>
         <label className="space-y-1">
           <div className="text-sm font-medium">Bien</div>
           <select
@@ -152,6 +168,7 @@ export default function BalanceClient({
             const q = new URLSearchParams({
               property: propertyId,
               year: String(year),
+              scope,
             });
             const url = `/api/synthesis/export/pdf?${q.toString()}`;
             const t = toast("Export PDF en cours…");
@@ -184,6 +201,7 @@ export default function BalanceClient({
             const q = new URLSearchParams({
               property: propertyId,
               year: String(year),
+              scope,
             });
             const url = `/api/synthesis/export/csv?${q.toString()}`;
             const t = toast("Export CSV en cours…");

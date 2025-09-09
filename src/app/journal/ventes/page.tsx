@@ -56,7 +56,7 @@ export default async function JournalVentesPage({
   if (depositFilter === "only") where.isDeposit = true;
   if (depositFilter === "without") where.isDeposit = false;
 
-  const [total, entries, tierSuggestions, accountSuggestions] =
+  const [total, entries, tierSuggestions, accountSuggestions, properties] =
     await Promise.all([
       prisma.journalEntry.count({ where }),
       prisma.journalEntry.findMany({
@@ -76,6 +76,11 @@ export default async function JournalVentesPage({
         distinct: ["account_code"],
         select: { account_code: true },
         take: 20,
+      }),
+      prisma.property.findMany({
+        where: { user_id: user.id },
+        select: { id: true, label: true },
+        orderBy: { label: "asc" },
       }),
     ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -117,7 +122,7 @@ export default async function JournalVentesPage({
           </h1>
           <p className="text-sm text-muted-foreground">{total} écritures</p>
         </div>
-        <JournalVentesClient />
+        <JournalVentesClient properties={properties} />
       </header>
 
       <section className="card p-4 space-y-4">
@@ -272,7 +277,9 @@ export default async function JournalVentesPage({
                       account_code: e.account_code,
                       amount: Number(e.amount),
                       isDeposit: e.isDeposit,
+                      propertyId: e.propertyId || "",
                     }}
+                    properties={properties}
                   />
                   <form
                     action={deleteEntryFormAction}

@@ -50,15 +50,29 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 
 ## Synthèse
 
+### Portée (Utilisateur | Bien)
+
+- Tu peux choisir la portée des agrégations: globale (Utilisateur) ou par Bien.
+- UI: sélecteur “Portée” sur Dashboard (mensuel) et Synthèse (Résultat, Bilan).
+- API: ajoute `scope=user` (défaut) ou `scope=property` aux endpoints:
+  - `/api/dashboard/monthly?property=<uuid>&year=YYYY&month=MM&scope=user|property`
+  - `/api/synthesis/income-statement?property=<uuid>&year=YYYY&scope=user|property`
+  - `/api/synthesis/balance?property=<uuid>&year=YYYY&scope=user|property`
+  - Exports: `/api/synthesis/export/{csv|pdf}?property=<uuid>&year=YYYY&scope=user|property`
+- Détails calcul:
+  - scope=user: agrège le journal complet (ventes hors cautions, achats) + assets de l’utilisateur.
+  - scope=property: agrège par bien (Income/Expense, Amortization liés au bien, assets liés au bien).
+  - Note: les écritures du journal et les immobilisations doivent être reliées à un bien (`propertyId`) pour que le mode "Bien" reflète fidèlement tes données.
+
 ### Compte de résultat (simple)
 
-- API: `GET /api/synthesis/income-statement?property=<uuid>&year=YYYY`
+- API: `GET /api/synthesis/income-statement?property=<uuid>&year=YYYY[&scope=user|property]`
 - Page: `/synthesis?tab=result` (sélecteurs Bien + Année)
 - Calcul: Revenus (ventes hors cautions) – Dépenses (achats hors 6811) – Amortissements (6811)
 
 ### Bilan (simple)
 
-- API: `GET /api/synthesis/balance?property=<uuid>&year=YYYY`
+- API: `GET /api/synthesis/balance?property=<uuid>&year=YYYY[&scope=user|property]`
 - Page: `/synthesis?tab=balance` (sélecteurs Bien + Année)
 - Calculs:
   - VNC (immobilisations nettes) = Σ (coût – amort cumulé ≤ 31/12)
@@ -71,21 +85,44 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 
 - Message affiché (FR grand public):
   > En LMNP, l’amortissement ne crée pas de déficit global. Si l’“usure” (amortissements) dépasse votre résultat d’exploitation, l’excédent peut être reporté sur les années suivantes.
+
 - Condition d’affichage (warning):
   - EBE = Revenus (hors cautions) – Dépenses (hors amortissements)
   - Si Amortissements > EBE → bannière visible (variant “warning”)
-  - Sinon → une icône/info-bulle “ℹ️ LMNP” permet de revoir le message
-- UX/Persistance:
+  - Sinon → une icône/info-bulle “ℹ️ LMNP” permet de revoir le message (moins intrusif)
+
+- UX / comportement:
   - Bouton “J’ai compris” masque la bannière pour la combinaison (bien, année)
-  - Persistance locale: `localStorage` clé `lmnp_banner_ack:<propertyId>:<year>`
-  - Accessibilité: rôle="status", `aria-live="polite"`, contraste suffisant
+  - Persistance locale: `localStorage` avec la clé `lmnp_banner_ack:<propertyId>:<year>` (ex. `lmnp_banner_ack:8a7f-2024`)
+  - Si la clé est présente, la bannière n’est plus affichée pour cette paire (propertyId, year) ; afficher alors le petit bouton/Popover “ℹ️ LMNP” pour la revoir
+  - Accessibilité: rôle="status" et `aria-live="polite"` sur la bannière; contraste suffisant pour le variant warning
+
+- Notes d'implémentation (technique):
+  - Composant UI: shadcn/ui `Alert` (variant "warning"), `Button`, `Popover`/`Tooltip` pour l’info
+  - Récupération des données: réutiliser l’API d’agrégation utilisée par le Compte de Résultat (pas de duplication)
+  - Calcul condition: `shouldShowLmnpBanner({ revenues, expenses, amort }) => amort > (revenues - expenses)`
+  - Persistance: lecture/écriture `localStorage` côté client uniquement
+
+- Tests attendus (Vitest):
+  1) Unitaires:
+     - `shouldShowLmnpBanner` retourne `true` si `amort > (revenues - expenses)`, sinon `false`.
+     - Tests de lecture/écriture de `localStorage` (clé `lmnp_banner_ack:<propertyId>:<year>`) via mock.
+  2) Intégration (React Testing Library):
+     - Cas A (amort > EBE) → la bannière warning s’affiche avec le texte exact.
+     - Cas B (amort <= EBE) → seule l’icône/info est affichée.
+     - Clic sur “J’ai compris” écrit la clé dans `localStorage` et masque la bannière.
+  3) E2E (facultatif, Playwright):
+     - Smoke test visite /synthesis, vérifie la bannière pour le cas amort > EBE, clique “J’ai compris” et recharge pour confirmer la persistance.
+
+- Pourquoi cette aide ?
+  - Permet d’éviter les erreurs d’interprétation du rôle de l’amortissement en LMNP et d’orienter l’usager vers la notion de report.
 
 ### Exports (PDF/CSV)
 
 - UI: depuis la page `/synthesis` (onglet Résultat ou Bilan) → boutons “Exporter PDF” et “Exporter CSV”.
 - Endpoints:
-  - PDF: `GET /api/synthesis/export/pdf?property=<uuid>&year=YYYY`
-  - CSV (ZIP): `GET /api/synthesis/export/csv?property=<uuid>&year=YYYY`
+  - PDF: `GET /api/synthesis/export/pdf?property=<uuid>&year=YYYY[&scope=user|property]`
+  - CSV (ZIP): `GET /api/synthesis/export/csv?property=<uuid>&year=YYYY[&scope=user|property]`
 - PDF (A4 portrait):
   - En-tête: nom du bien, année, date d’édition
   - Compte de résultat (4 lignes): Revenus, Dépenses, Amortissements, Résultat
@@ -132,3 +169,7 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - Bannière d’aide affichée si `amortissements > (revenus - dépenses)` (EBE)
   - Bouton “J’ai compris” (persistance locale par bien + année)
   - Icône/info-bulle “ℹ️ LMNP” si la condition n’est pas remplie
+- [2025-09-09] Synthèse : sélection de portée (Utilisateur | Bien)
+  - UI: sélecteur sur Dashboard et Synthèse (Résultat/Bilan)
+  - API: prise en charge du paramètre `scope=user|property` (+ exports CSV/PDF)
+  - Schéma Prisma: `propertyId` sur `journal_entries` et `assets` (optionnel)

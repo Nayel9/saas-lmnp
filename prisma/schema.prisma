@@ -18,6 +18,8 @@ model Property {
   incomes       Income[]
   expenses      Expense[]
   amortizations Amortization[]
+  JournalEntry  JournalEntry[]
+  Asset         Asset[]
 
   @@map("Property")
 }
@@ -85,25 +87,31 @@ model JournalEntry {
   created_at   DateTime         @default(now())
   attachments  Attachment[]
   isDeposit    Boolean          @default(false)
+  propertyId   String?
+  property     Property?        @relation(fields: [propertyId], references: [id])
 
   @@index([user_id])
   @@index([user_id, date, isDeposit])
+  @@index([propertyId])
   @@map("journal_entries")
 }
 
 model Asset {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   user_id          String
   label            String
-  amount_ht        Decimal  @db.Decimal(12, 2)
+  amount_ht        Decimal   @db.Decimal(12, 2)
   duration_years   Int
   acquisition_date DateTime
   account_code     String
-  created_at       DateTime @default(now())
+  created_at       DateTime  @default(now())
+  propertyId       String?
+  property         Property? @relation(fields: [propertyId], references: [id])
 
   attachments Attachment[]
 
   @@index([user_id])
+  @@index([propertyId])
   @@map("assets")
 }
 

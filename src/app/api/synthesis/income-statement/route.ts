@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const UUID = z.string().uuid();
 const YEAR = z.coerce.number().int().min(2000).max(2100);
+const SCOPE = z.enum(["user", "property"]).default("user");
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
   const p =
     searchParams.get("property") || searchParams.get("propertyId") || undefined;
   const y = searchParams.get("year") ?? undefined;
+  const s = searchParams.get("scope") ?? undefined;
 
   if (!p) return new Response("BAD_REQUEST: property requis", { status: 400 });
   const idParse = UUID.safeParse(p);
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest) {
 
   const propertyId = idParse.data;
   const year = yearParse.data;
+  const scope = SCOPE.parse(s ?? "user");
 
   // Vérifier que le bien appartient à l'utilisateur
   const property = await prisma.property.findUnique({
@@ -85,27 +88,44 @@ export async function GET(req: NextRequest) {
   const start = new Date(Date.UTC(year, 0, 1));
   const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
-  // Note: le schéma JournalEntry n'a pas de propertyId; on scope par user + année.
-  const entries = (await prisma.journalEntry.findMany({
-    where: { user_id: user.id, date: { gte: start, lte: end } },
-    orderBy: { date: "asc" },
-  })) as unknown as JournalEntryLike[];
-
   let revenus = 0,
     depenses = 0;
-  for (const e of entries) {
-    const d = new Date(e.date);
-    if (d < start || d > end) continue; // garde-fou
-    const amt = toNum(e.amount);
-    if (!amt) continue;
-    if (e.type === "vente") {
-      if (e.isDeposit) continue; // exclure cautions
-      revenus += amt;
-    } else if (e.type === "achat") {
-      // Toutes les charges hors dotations (les dotations viennent d'Amortization/Assets)
-      depenses += amt;
+
+  if (scope === "user") {
+    // Note: le schéma JournalEntry n'a pas de propertyId; on scope par user + année.
+    const entries = (await prisma.journalEntry.findMany({
+      where: { user_id: user.id, date: { gte: start, lte: end } },
+      orderBy: { date: "asc" },
+    })) as unknown as JournalEntryLike[];
+
+    for (const e of entries) {
+      const d = new Date(e.date);
+      if (d < start || d > end) continue; // garde-fou
+      const amt = toNum(e.amount);
+      if (!amt) continue;
+      if (e.type === "vente") {
+        if (e.isDeposit) continue; // exclure cautions
+        revenus += amt;
+      } else if (e.type === "achat") {
+        depenses += amt;
+      }
     }
+  } else {
+    // scope === "property": utiliser Income/Expense par bien
+    const [incomeAgg, expenseAgg] = await Promise.all([
+      prisma.income.aggregate({
+        _sum: { amount: true },
+        where: { user_id: user.id, propertyId, date: { gte: start, lte: end } },
+      }),
+      prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: { user_id: user.id, propertyId, date: { gte: start, lte: end } },
+      }),
+    ]);
+    revenus = toNum(incomeAgg._sum.amount);
+    depenses = toNum(expenseAgg._sum.amount);
   }
+
   revenus = round2(revenus);
   depenses = round2(depenses);
 
@@ -143,6 +163,7 @@ export async function GET(req: NextRequest) {
   const body = JSON.stringify({
     year,
     propertyId,
+    scope,
     revenus,
     depenses,
     amortissements,

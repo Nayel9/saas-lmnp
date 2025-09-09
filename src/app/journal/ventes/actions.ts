@@ -21,6 +21,7 @@ const entrySchema = z.object({
   amount: z.string().refine((v) => !isNaN(parseFloat(v)), "Montant invalide"),
   currency: z.string().default("EUR"),
   isDeposit: z.preprocess(toBool, z.boolean().default(false)).optional(),
+  propertyId: z.string().uuid(),
 });
 
 export type EntryFormData = z.infer<typeof entrySchema>;
@@ -40,10 +41,15 @@ export async function createEntry(formData: FormData) {
       error: parsed.error.flatten().formErrors.join(", "),
     } as const;
   const userId = await getUserId();
-  const { date, designation, tier, account_code, amount, currency, isDeposit } =
+  const { date, designation, tier, account_code, amount, currency, isDeposit, propertyId } =
     parsed.data;
   if (isAllowed(account_code, "achat") && !isAllowed(account_code, "vente")) {
     return { ok: false, error: "Compte réservé aux achats" } as const;
+  }
+  // Vérifier appartenance du bien
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== userId) {
+    return { ok: false, error: "Bien invalide" } as const;
   }
   const created = await prisma.journalEntry.create({
     data: {
@@ -56,6 +62,7 @@ export async function createEntry(formData: FormData) {
       amount: parseFloat(amount),
       currency,
       isDeposit: !!isDeposit,
+      propertyId,
     },
   });
   revalidatePath("/journal/ventes");
@@ -76,12 +83,17 @@ export async function updateEntry(formData: FormData) {
     amount,
     currency,
     isDeposit,
+    propertyId,
   } = parsed.data;
   const existing = await prisma.journalEntry.findUnique({ where: { id } });
   if (!existing || existing.user_id !== userId)
     return { ok: false, error: "Introuvable" };
   if (isAllowed(account_code, "achat") && !isAllowed(account_code, "vente")) {
     return { ok: false, error: "Compte réservé aux achats" };
+  }
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== userId) {
+    return { ok: false, error: "Bien invalide" };
   }
   await prisma.journalEntry.update({
     where: { id },
@@ -93,6 +105,7 @@ export async function updateEntry(formData: FormData) {
       amount: parseFloat(amount),
       currency,
       isDeposit: !!isDeposit,
+      propertyId,
     },
   });
   revalidatePath("/journal/ventes");

@@ -40,13 +40,18 @@ export default async function AssetsPage({
       { label: { contains: sp.q as string, mode: "insensitive" } },
       { account_code: { contains: sp.q as string, mode: "insensitive" } },
     ];
-  const [total, rows] = await Promise.all([
+  const [total, rows, properties] = await Promise.all([
     prisma.asset.count({ where }),
     prisma.asset.findMany({
       where,
       orderBy: { created_at: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+    }),
+    prisma.property.findMany({
+      where: { user_id: user.id },
+      select: { id: true, label: true },
+      orderBy: { label: "asc" },
     }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -79,7 +84,7 @@ export default async function AssetsPage({
           </h1>
           <p className="text-sm text-muted-foreground">{total} éléments</p>
         </div>
-        <AddAssetButton />
+        <AddAssetButton properties={properties} />
       </header>
       <div className="card p-4 overflow-x-auto">
         <table className="w-full text-sm">
@@ -138,7 +143,9 @@ export default async function AssetsPage({
                       duration_years: a.duration_years,
                       acquisition_date: a.acquisition_date,
                       account_code: a.account_code,
+                      propertyId: a.propertyId || "",
                     }}
+                    properties={properties}
                   />
                   <form action={deleteAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={a.id} />

@@ -30,6 +30,7 @@ const assetSchema = z.object({
       (v) => assetAccountCodes.includes(v),
       "Compte immobilisation inconnu",
     ),
+  propertyId: z.string().uuid(),
 });
 
 async function getUserId() {
@@ -46,10 +47,14 @@ export async function createAsset(formData: FormData) {
       ok: false,
       error: parsed.error.issues.map((i) => i.message).join(", "),
     };
-  const { account_code } = parsed.data;
+  const { account_code, propertyId } = parsed.data;
   if (!isAllowed(account_code, "asset"))
     return { ok: false, error: "Compte immobilisation invalide" };
   const user_id = await getUserId();
+  // Vérifier appartenance du bien
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== user_id)
+    return { ok: false, error: "Bien invalide" };
   const { label, amount_ht, duration_years, acquisition_date } = parsed.data;
   const created = await prisma.asset.create({
     data: {
@@ -59,6 +64,7 @@ export async function createAsset(formData: FormData) {
       duration_years: Number(duration_years),
       acquisition_date: new Date(acquisition_date),
       account_code,
+      propertyId,
     },
   });
   revalidatePath("/assets");
@@ -69,7 +75,7 @@ export async function updateAsset(formData: FormData) {
   const parsed = assetSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success || !parsed.data.id)
     return { ok: false, error: "Validation" };
-  const { account_code } = parsed.data;
+  const { account_code, propertyId } = parsed.data;
   if (!isAllowed(account_code, "asset"))
     return { ok: false, error: "Compte immobilisation invalide" };
   const user_id = await getUserId();
@@ -78,6 +84,9 @@ export async function updateAsset(formData: FormData) {
   const existing = await prisma.asset.findUnique({ where: { id } });
   if (!existing || existing.user_id !== user_id)
     return { ok: false, error: "Introuvable" };
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== user_id)
+    return { ok: false, error: "Bien invalide" };
   await prisma.asset.update({
     where: { id },
     data: {
@@ -86,6 +95,7 @@ export async function updateAsset(formData: FormData) {
       duration_years: Number(duration_years),
       acquisition_date: new Date(acquisition_date),
       account_code,
+      propertyId,
     },
   });
   revalidatePath("/assets");
