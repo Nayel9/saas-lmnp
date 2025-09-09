@@ -62,7 +62,7 @@ async function createAttachment(parent: { entryId?: string; assetId?: string; fi
   const payload = entryId ? { entryId, fileName, fileSize, mimeType, storageKey } : { assetId, fileName, fileSize, mimeType, storageKey };
   const res = await fetch('/api/attachments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
   if (!res.ok) throw new Error('Enregistrement pièce échoué');
-  return res.json();
+  return res.json() as Promise<{ ok: boolean; attachment: AttachmentDto }>;
 }
 
 export function AttachmentsButton(props: { entryId?: string; assetId?: string; count: number }) {
@@ -131,7 +131,13 @@ export function AttachmentsPanel({ entryId, assetId, onCloseAction, onCountChang
         setBusy(true);
         const pre = await presign(parent, f);
         await directUpload(pre, f);
-        await createAttachment({ ...parent, fileName: f.name, fileSize: f.size, mimeType: f.type || 'application/octet-stream', storageKey: pre.storageKey });
+        const created = await createAttachment({ ...parent, fileName: f.name, fileSize: f.size, mimeType: f.type || 'application/octet-stream', storageKey: pre.storageKey });
+        // Mise à jour optimiste immédiate
+        setItems(prev => {
+          const next = [created.attachment, ...(prev || [])];
+          onCountChangeAction?.(next.length);
+          return next;
+        });
         toast.success(`Ajouté: ${f.name}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Upload échoué';
@@ -140,8 +146,9 @@ export function AttachmentsPanel({ entryId, assetId, onCloseAction, onCountChang
         setBusy(false);
       }
     }
+    // Rechargement pour cohérence (idempotent)
     await reload();
-  }, [parent, reload]);
+  }, [parent, reload, onCountChangeAction]);
 
   const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

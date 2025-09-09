@@ -84,8 +84,10 @@ model JournalEntry {
   currency     String           @default("EUR")
   created_at   DateTime         @default(now())
   attachments  Attachment[]
+  isDeposit    Boolean          @default(false)
 
   @@index([user_id])
+  @@index([user_id, date, isDeposit])
   @@map("journal_entries")
 }
 

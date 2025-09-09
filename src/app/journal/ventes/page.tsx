@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 20;
 
+type DepositFilter = 'all' | 'only' | 'without';
+
 export default async function JournalVentesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const session = await auth();
@@ -33,6 +35,9 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
     ];
   }
   if (sp.account_code) where.account_code = { contains: sp.account_code as string, mode: 'insensitive' };
+  const depositFilter = ((sp.deposit as string)||'all') as DepositFilter;
+  if (depositFilter === 'only') where.isDeposit = true;
+  if (depositFilter === 'without') where.isDeposit = false;
 
   const [total, entries, tierSuggestions, accountSuggestions] = await Promise.all([
     prisma.journalEntry.count({ where }),
@@ -41,8 +46,9 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
     prisma.journalEntry.findMany({ where: { user_id: user.id, type: 'vente' }, distinct: ['account_code'], select: { account_code: true }, take: 20 }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const totals = computeVisibleTotals(entries.map(e => ({ amount: Number(e.amount) })));
-  const hasActiveFilter = !!(sp.from || sp.to || sp.q || sp.tier || sp.account_code);
+  const visibleForTotals = entries.filter(e => !e.isDeposit); // exclure les cautions du total affiché
+  const totals = computeVisibleTotals(visibleForTotals.map(e => ({ amount: Number(e.amount) })));
+  const hasActiveFilter = !!(sp.from || sp.to || sp.q || sp.tier || sp.account_code || (depositFilter!=='all'));
 
   const ids = entries.map(e => e.id);
   const countsRaw = ids.length ? await prisma.attachment.groupBy({ by: ['entryId'], where: { entryId: { in: ids } }, _count: { _all: true } }) : [];
@@ -65,13 +71,18 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
       </header>
 
       <section className="card p-4 space-y-4">
-        <form className="grid md:grid-cols-6 gap-3 text-sm" method="get">
+        <form className="grid md:grid-cols-7 gap-3 text-sm" method="get">
           <input type="date" name="from" aria-label="Date début" defaultValue={(sp.from as string)||''} className="input" placeholder="De" />
           <input type="date" name="to" aria-label="Date fin" defaultValue={(sp.to as string)||''} className="input" placeholder="À" />
           <input name="tier" list="tiers-ventes" aria-label="Client" defaultValue={(sp.tier as string)||''} className="input" placeholder="Client" />
           <datalist id="tiers-ventes">{tierSuggestions.filter(t=>t.tier).map(t=> <option key={t.tier}>{t.tier}</option>)}</datalist>
           <input name="account_code" list="accounts-ventes" aria-label="Compte comptable" defaultValue={(sp.account_code as string)||''} className="input" placeholder="Compte" />
           <datalist id="accounts-ventes">{accountSuggestions.map(a=> <option key={a.account_code}>{a.account_code}</option>)}</datalist>
+          <select name="deposit" aria-label="Caution" defaultValue={depositFilter} className="input">
+            <option value="all">Toutes</option>
+            <option value="only">Cautions seulement</option>
+            <option value="without">Sans cautions</option>
+          </select>
           <input name="q" aria-label="Recherche texte" defaultValue={(sp.q as string)||''} className="input md:col-span-2" placeholder="Recherche texte" />
           <div className="flex items-center gap-2 md:col-span-2">
             <button className="btn-primary">Filtrer</button>
@@ -84,7 +95,7 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
         </form>
         <div className="flex flex-wrap gap-4 text-sm">
           <span><strong>{totals.count}</strong> lignes visibles</span>
-          <span>Total: <strong>{formatAmount(totals.sum)}</strong></span>
+          <span>Total (hors cautions): <strong>{formatAmount(totals.sum)}</strong></span>
           <a className="btn text-xs" href={`/api/journal/ventes/export?format=pdf${sp.from?`&from=${sp.from}`:''}${sp.to?`&to=${sp.to}`:''}${sp.tier?`&tier=${sp.tier}`:''}${sp.account_code?`&account_code=${sp.account_code}`:''}${sp.q?`&q=${sp.q}`:''}`}>Export PDF</a>
         </div>
       </section>
@@ -106,7 +117,10 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
             {entries.map(e => (
               <tr key={e.id} className="border-b last:border-none hover:bg-bg-muted">
                 <td className="py-1 pr-4 whitespace-nowrap">{formatDateISO(e.date)}</td>
-                <td className="py-1 pr-4">{e.designation}</td>
+                <td className="py-1 pr-4">
+                  <span>{e.designation}</span>
+                  {e.isDeposit && <span className="badge ml-2" title="Exclue du revenu">Caution</span>}
+                </td>
                 <td className="py-1 pr-4">{e.tier}</td>
                 <td className="py-1 pr-4">{e.account_code}</td>
                 <td className="py-1 pr-4 text-right tabular-nums">{formatAmount(Number(e.amount))}</td>
@@ -117,7 +131,7 @@ export default async function JournalVentesPage({ searchParams }: { searchParams
                   </div>
                 </td>
                 <td className="py-1 pr-2 text-right">
-                  <EditButton entry={{ id: e.id, date: e.date, designation: e.designation, tier: e.tier, account_code: e.account_code, amount: Number(e.amount) }} />
+                  <EditButton entry={{ id: e.id, date: e.date, designation: e.designation, tier: e.tier, account_code: e.account_code, amount: Number(e.amount), isDeposit: e.isDeposit }} />
                   <form action={deleteEntryFormAction} className="inline-block ml-1">
                     <input type="hidden" name="id" value={e.id} />
                     <SubmitButton className="text-xs text-[--color-danger] hover:underline" pendingLabel="Suppression…">Suppr</SubmitButton>

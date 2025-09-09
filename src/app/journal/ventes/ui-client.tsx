@@ -16,7 +16,8 @@ const schema = z.object({
   tier: z.string().optional().nullable(),
   account_code: z.string().min(1),
   amount: z.string().min(1),
-  currency: z.string().default('EUR')
+  currency: z.string().default('EUR'),
+  isDeposit: z.any().optional(),
 });
 
 async function presign(entryId: string, file: File) {
@@ -81,14 +82,14 @@ export default function JournalVentesClient() {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    fd.set('currency','EUR');
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
-    (obj as unknown as { currency: string }).currency = 'EUR';
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
       setError('Validation: ' + parsed.error.issues.map(i => i.message).join(', '));
       return;
     }
-    if (isAllowed(parsed.data.account_code,'achat') && !isAllowed(parsed.data.account_code,'vente')) {
+    if (isAllowed(String(fd.get('account_code')||''),'achat') && !isAllowed(String(fd.get('account_code')||''),'vente')) {
       setError('Compte réservé aux achats');
       return;
     }
@@ -117,6 +118,12 @@ export default function JournalVentesClient() {
               <AccountCodeSelector typeJournal="vente" />
               <input name="amount" placeholder="Montant" className="input w-full" />
 
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="isDeposit" value="on" />
+                <span>Caution (à exclure du revenu)</span>
+                <span className="text-xs text-muted-foreground" title="La caution n’est pas un revenu. Elle sera affichée dans ‘Ce que je dois’ au bilan.">?</span>
+              </label>
+
               <div className="mt-2 border rounded-md p-3">
                 <div className="text-sm font-medium mb-1">Justificatifs</div>
                 <div onDragOver={(e)=>e.preventDefault()} onDrop={onDrop} className="text-xs text-muted-foreground border border-dashed rounded p-3">
@@ -140,7 +147,7 @@ export default function JournalVentesClient() {
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
                 <button disabled={isPending} className="btn-primary inline-flex items-center gap-2">{isPending && <Spinner />}{isPending? 'Enregistrement...' : 'Enregistrer'}</button>
               </div>
-              {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+              {error && <p className="text-xs text-[--color-danger]">{error}</p>}
             </form>
           </div>
         </div>
@@ -150,7 +157,7 @@ export default function JournalVentesClient() {
 }
 
 interface EditButtonProps {
-  entry: { id: string; date: string | Date; designation: string; tier: string | null; account_code: string; amount: string | number };
+  entry: { id: string; date: string | Date; designation: string; tier: string | null; account_code: string; amount: string | number; isDeposit?: boolean };
 }
 
 export function EditButton({ entry }: EditButtonProps) {
@@ -170,7 +177,7 @@ export function EditButton({ entry }: EditButtonProps) {
       setError('Validation: ' + parsed.error.issues.map(i => i.message).join(', '));
       return;
     }
-    if (isAllowed(parsed.data.account_code,'achat') && !isAllowed(parsed.data.account_code,'vente')) {
+    if (isAllowed(String(fd.get('account_code')||''),'achat') && !isAllowed(String(fd.get('account_code')||''),'vente')) {
       setError('Compte réservé aux achats');
       return;
     }
@@ -194,11 +201,18 @@ export function EditButton({ entry }: EditButtonProps) {
               <input name="tier" defaultValue={entry.tier || ''} className="input w-full" />
               <AccountCodeSelector typeJournal="vente" defaultValue={entry.account_code} />
               <input name="amount" defaultValue={entry.amount} className="input w-full" />
+
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="isDeposit" defaultChecked={!!entry.isDeposit} />
+                <span>Caution (à exclure du revenu)</span>
+                <span className="text-xs text-muted-foreground" title="La caution n’est pas un revenu. Elle sera affichée dans ‘Ce que je dois’ au bilan.">?</span>
+              </label>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="btn" onClick={() => setOpen(false)}>Annuler</button>
                 <button disabled={isPending} className="btn-primary inline-flex items-center gap-2">{isPending && <Spinner />}{isPending? 'Sauvegarde...' : 'Mettre à jour'}</button>
               </div>
-              {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+              {error && <p className="text-xs text-[--color-danger]">{error}</p>}
             </form>
           </div>
         </div>
