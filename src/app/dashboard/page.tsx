@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/core';
 import { getUserRole } from '@/lib/auth';
 import Link from "next/link";
 import { createProperty } from "./actions";
+import { getDepositsSummary } from '@/lib/deposits';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,8 @@ export default async function DashboardPage() {
     const displayName = user?.firstName && user?.lastName
         ? `${user.firstName} ${user.lastName}`
         : user?.email;
+
+    const deposits = await getDepositsSummary({ userId: user.id, to: new Date() });
 
     return (
         <main className="min-h-screen p-8 space-y-8 max-w-5xl mx-auto">
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
                         <li>Ajouter revenus & dépenses</li>
                         <li>Amortissements</li>
                         <li>Exports fiscaux</li>
+                        <li><span className="text-foreground font-medium">Cautions en cours</span>: {deposits.sum.toFixed(2)} EUR ({deposits.count})</li>
                     </ul>
                 </div>
             </section>

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 vi.mock('../prisma', () => {
   type JEType = 'achat' | 'vente';
-  interface MockJournalEntry { user_id: string; type: JEType; date: Date; designation: string; tier?: string; account_code: string; amount: number; currency: string }
+  interface MockJournalEntry { user_id: string; type: JEType; date: Date; designation: string; tier?: string; account_code: string; amount: number; currency: string; isDeposit?: boolean }
   interface FieldFilter { contains: string; mode?: string }
   interface ORCond { designation?: FieldFilter; tier?: FieldFilter; account_code?: FieldFilter }
   interface DateFilter { gte?: Date; lte?: Date }
@@ -13,16 +13,16 @@ vi.mock('../prisma', () => {
     if (where.user_id && e.user_id !== where.user_id) return false;
     if (where.date?.gte && !(e.date >= where.date.gte)) return false;
     if (where.date?.lte && !(e.date <= where.date.lte)) return false;
-    if (where.account_code?.contains && !e.account_code.toLowerCase().includes(where.account_code.contains.toLowerCase())) return false;
-    return true;
+    return !(where.account_code?.contains && !e.account_code.toLowerCase().includes(where.account_code.contains.toLowerCase()));
+
   }
   function passesOR(e: MockJournalEntry, ors?: ORCond[]): boolean {
     if (!ors || !ors.length) return true;
     return ors.some(cond => {
       if (cond.designation?.contains && e.designation.toLowerCase().includes(cond.designation.contains.toLowerCase())) return true;
       if (cond.tier?.contains && (e.tier||'').toLowerCase().includes(cond.tier.contains.toLowerCase())) return true;
-      if (cond.account_code?.contains && e.account_code.toLowerCase().includes(cond.account_code.contains.toLowerCase())) return true;
-      return false;
+      return !!(cond.account_code?.contains && e.account_code.toLowerCase().includes(cond.account_code.contains.toLowerCase()));
+
     });
   }
   function findMany(args: FindManyArgs): Promise<MockJournalEntry[] | Record<string, unknown>[]> {
@@ -61,6 +61,7 @@ beforeAll(async () => {
   const baseDate = new Date('2025-01-15');
   await prisma.journalEntry.createMany({ data: [
     { user_id: userId, type: 'vente', date: baseDate, designation: 'Vente test', tier: 'ClientA', account_code: '706', amount: 1000, currency: 'EUR' },
+    { user_id: userId, type: 'vente', date: baseDate, designation: 'Caution Loc', tier: 'ClientB', account_code: '706', amount: 200, currency: 'EUR', isDeposit: true },
     { user_id: userId, type: 'achat', date: baseDate, designation: 'Achat charges', tier: 'Fourn1', account_code: '606', amount: 300, currency: 'EUR' },
     { user_id: userId, type: 'achat', date: baseDate, designation: 'Assurance', tier: 'Assureur', account_code: '616', amount: 50, currency: 'EUR' },
     { user_id: userId, type: 'achat', date: baseDate, designation: 'Taxe', tier: 'Etat', account_code: '635', amount: 20, currency: 'EUR' },
@@ -73,9 +74,9 @@ afterAll(async () => {
 });
 
 describe('compute2033C', () => {
-  it('calcule totaux attendus', async () => {
+  it('calcule totaux attendus en excluant les cautions', async () => {
     const res = await compute2033C({ userId });
-    expect(res.totals.produits).toBe(1000); // CA
+    expect(res.totals.produits).toBe(1000); // CA, la caution 200 est exclue
     expect(res.totals.charges).toBe(370);   // 300 + 50 + 20
     expect(res.totals.amortissements).toBe(200);
     expect(res.totals.resultat).toBe(430);  // 1000 - 370 - 200

@@ -8,8 +8,8 @@ vi.mock('../prisma', () => {
     if (!where) return true;
     if (where.user_id && a.user_id !== where.user_id) return false;
     if (where.acquisition_date?.lte && !(a.acquisition_date <= where.acquisition_date.lte)) return false;
-    if (where.label?.contains && !a.label.toLowerCase().includes(where.label.contains.toLowerCase())) return false;
-    return true;
+    return !(where.label?.contains && !a.label.toLowerCase().includes(where.label.contains.toLowerCase()));
+
   }
   function findMany({ where, orderBy }: FindManyArgs): Promise<MockAsset[]> {
     let list = assets.filter(a => matches(a, where));
@@ -25,7 +25,11 @@ vi.mock('../prisma', () => {
     for (let i = assets.length -1; i>=0; i--) if (matches(assets[i], where)) assets.splice(i,1);
     return Promise.resolve({ count: before - assets.length });
   }
-  return { prisma: { asset: { findMany, create, deleteMany } } };
+  // Ajout: mock minimal pour journalEntry.aggregate (cautions)
+  function aggregate(): Promise<{ _sum: { amount: number } }> {
+    return Promise.resolve({ _sum: { amount: 0 } });
+  }
+  return { prisma: { asset: { findMany, create, deleteMany }, journalEntry: { aggregate } } };
 });
 import { prisma } from '../prisma';
 import { compute2033A } from './compute2033a';
@@ -51,14 +55,14 @@ describe('compute2033A', () => {
     expect(r2024.immobilisations_brutes).toBe(20000);
     expect(r2024.amortissements_cumules).toBeCloseTo(1500, 2);
     expect(r2024.immobilisations_nettes).toBeCloseTo(18500, 2);
-    expect(r2024.actif_total).toBeCloseTo(r2024.capitaux_propres_equilibrage, 2);
+    expect(r2024.actif_total).toBeCloseTo(r2024.capitaux_propres_equilibrage + r2024.deposits_held, 2);
   });
   it('année 2025: brut=23000 cumul=4500 net=18500 (3500 + 1000)', async () => {
     const r2025 = await compute2033A({ userId, year: 2025 });
     expect(r2025.immobilisations_brutes).toBe(23000);
     expect(r2025.amortissements_cumules).toBeCloseTo(4500, 2); // 1500 + 2000 + 1000
     expect(r2025.immobilisations_nettes).toBeCloseTo(18500, 2);
-    expect(r2025.actif_total).toBeCloseTo(r2025.capitaux_propres_equilibrage, 2);
+    expect(r2025.actif_total).toBeCloseTo(r2025.capitaux_propres_equilibrage + r2025.deposits_held, 2);
   });
   it('cohérence partielle avec compute2033E (dotations)', async () => {
     const e2025 = await compute2033E({ userId, year: 2025 });

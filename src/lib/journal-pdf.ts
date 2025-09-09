@@ -7,6 +7,7 @@ export interface JournalPdfRow {
   tier?: string | null;
   account_code: string;
   amount: number | string;
+  isDeposit?: boolean; // nouveau: indiquer caution
 }
 
 export interface JournalPdfOptions {
@@ -31,7 +32,8 @@ function truncate(s: string, max: number) { return s.length > max ? s.slice(0, m
 interface Columns { date: number; des: number; tier: number; acc: number; amt: number; }
 export async function generateJournalPdf(opts: JournalPdfOptions): Promise<Uint8Array> {
   const { title, rows, period, filters = {}, truncateAt = 5000, tierLabel = 'Tiers' } = opts;
-  const totals = computeVisibleTotals(rows.map(r => ({ amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount })));
+  // Exclure cautions des totaux
+  const totals = computeVisibleTotals(rows.filter(r => !r.isDeposit).map(r => ({ amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount })));
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -76,7 +78,8 @@ export async function generateJournalPdf(opts: JournalPdfOptions): Promise<Uint8
     }
     const amountNum = typeof r.amount === 'number' ? r.amount : parseFloat(r.amount);
     drawText(r.date.toISOString().slice(0,10), colX.date, y, 9);
-    drawText(truncate(r.designation, 28), colX.des, y, 9);
+    const des = r.isDeposit ? `${r.designation} [Caution]` : r.designation;
+    drawText(truncate(des, 28), colX.des, y, 9);
     drawText(truncate(r.tier || '', 15), colX.tier, y, 9);
     drawText(r.account_code, colX.acc, y, 9);
     drawText(amountNum.toFixed(2), colX.amt, y, 9);
@@ -92,7 +95,7 @@ export async function generateJournalPdf(opts: JournalPdfOptions): Promise<Uint8
   }
 
   y -= LINE_HEIGHT;
-  drawText(`Total lignes: ${totals.count}  Total montant: ${totals.sum.toFixed(2)}` , LEFT, y, 10);
+  drawText(`Total lignes (hors cautions): ${totals.count}  Total montant: ${totals.sum.toFixed(2)}` , LEFT, y, 10);
 
   return await pdfDoc.save();
 }

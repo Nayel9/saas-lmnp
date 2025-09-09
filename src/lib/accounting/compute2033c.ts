@@ -49,9 +49,11 @@ function round2(n: number){ return Math.round(n*100)/100; }
 export async function compute2033C(params: C2033CParams): Promise<C2033CResult> {
   const where = buildWhere(params);
   const entries = await prisma.journalEntry.findMany({ where, orderBy: { date: 'asc' } });
+  // Exclure les ventes marquées comme caution du calcul des produits
+  const filtered = entries.filter(e => !(e.type === 'vente' && e.isDeposit === true));
   let truncated = false;
-  let slice = entries;
-  if (entries.length > MAX_ENTRIES) { truncated = true; slice = entries.slice(0, MAX_ENTRIES); }
+  let slice = filtered;
+  if (filtered.length > MAX_ENTRIES) { truncated = true; slice = filtered.slice(0, MAX_ENTRIES); }
   const mapped = mapToRubriques(slice.map(e => ({ type: e.type, account_code: e.account_code, amount: safeParse(e.amount), date: e.date })), { from: params.from ? new Date(params.from) : undefined, to: params.to ? new Date(params.to) : undefined });
   const totals = computeTotals(mapped.rubriques);
   return { rubriques: mapped.rubriques, totals, truncated, count_entries: entries.length };

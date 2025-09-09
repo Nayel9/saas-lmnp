@@ -9,9 +9,8 @@ export const dynamic = 'force-dynamic';
 
 function isS3Ready() {
   try {
-    // Accessing will throw if misconfigured
-    const { S3_BUCKET } = process.env;
-    return Boolean(S3_BUCKET);
+    const { S3_BUCKET, ENABLE_S3_UPLOADS } = process.env as Record<string, string | undefined>;
+    return Boolean(S3_BUCKET && ENABLE_S3_UPLOADS === 'true');
   } catch {
     return false;
   }

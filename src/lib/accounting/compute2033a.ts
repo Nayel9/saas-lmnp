@@ -10,6 +10,7 @@ export interface C2033AResult {
   immobilisations_nettes: number;
   tresorerie: number; // v1 fixe 0
   actif_total: number;
+  deposits_held: number; // Ajout: cautions détenues (passif)
   capitaux_propres_equilibrage: number;
   count_assets: number;
   truncated: boolean;
@@ -41,7 +42,13 @@ export async function compute2033A(params: C2033AParams): Promise<C2033AResult> 
   let nettes = round2(brut - cumul); if (nettes < 0) nettes = 0;
   const tresorerie = 0; // v1
   const actif_total = round2(nettes + tresorerie);
-   // équilibrage V1
-    return { year, immobilisations_brutes: brut, amortissements_cumules: cumul, immobilisations_nettes: nettes, tresorerie, actif_total, capitaux_propres_equilibrage: actif_total, count_assets: assets.length, truncated };
-}
 
+  // Cautions détenues (toutes ventes isDeposit jusqu'à fin d'année)
+  const deposits = await prisma.journalEntry.aggregate({ _sum: { amount: true }, where: { user_id: userId, type: 'vente', isDeposit: true, date: { lte: endDate } } });
+  const deposits_held = round2(Number(deposits._sum.amount || 0));
+
+  // Équilibrage: Capitaux propres = Actif total - Cautions détenues (passif)
+  const capitaux_propres_equilibrage = round2(actif_total - deposits_held);
+
+  return { year, immobilisations_brutes: brut, amortissements_cumules: cumul, immobilisations_nettes: nettes, tresorerie, actif_total, deposits_held, capitaux_propres_equilibrage, count_assets: assets.length, truncated };
+}

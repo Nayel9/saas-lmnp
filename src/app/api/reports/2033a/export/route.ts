@@ -24,9 +24,11 @@ export async function GET(req: NextRequest) {
     { Poste: 'Trésorerie (v1)', Montant: r.tresorerie.toFixed(2) },
     { Poste: 'TOTAL ACTIF', Montant: r.actif_total.toFixed(2) }
   ];
+  const totalPassif = (r.deposits_held + r.capitaux_propres_equilibrage).toFixed(2);
   const passifRows = [
+    { Poste: 'Cautions détenues', Montant: r.deposits_held.toFixed(2) },
     { Poste: 'Capitaux propres (équilibrage v1)', Montant: r.capitaux_propres_equilibrage.toFixed(2) },
-    { Poste: 'TOTAL PASSIF', Montant: r.capitaux_propres_equilibrage.toFixed(2) }
+    { Poste: 'TOTAL PASSIF', Montant: totalPassif }
   ];
   const wsA = XLSX.utils.json_to_sheet(actifRows);
   XLSX.utils.book_append_sheet(wb, wsA, '2033A_Actif');

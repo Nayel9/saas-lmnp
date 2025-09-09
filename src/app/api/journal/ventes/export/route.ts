@@ -41,14 +41,14 @@ export async function GET(req: NextRequest) {
   const rows = await prisma.journalEntry.findMany({ where, orderBy: { date: 'desc' } });
 
   if (format === 'csv') {
-    const header = 'date;designation;client;account_code;amount;currency\n';
-    const body = rows.map(r => [r.date.toISOString().slice(0,10), r.designation, r.tier||'', r.account_code, Number(r.amount), r.currency].join(';')).join('\n');
+    const header = 'date;designation;client;account_code;amount;currency;isDeposit\n';
+    const body = rows.map(r => [r.date.toISOString().slice(0,10), r.designation, r.tier||'', r.account_code, Number(r.amount), r.currency, r.isDeposit ? '1':'0'].join(';')).join('\n');
     return new Response(header + body + (body?'\n':''), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="journal-ventes.csv"' }});
   }
   if (format === 'pdf') {
     const pdfBuf = await generateJournalPdf({
       title: 'Journal Ventes',
-      rows: rows.map(r => ({ date: r.date, designation: r.designation, tier: r.tier, account_code: r.account_code, amount: Number(r.amount) })),
+      rows: rows.map(r => ({ date: r.date, designation: r.designation, tier: r.tier, account_code: r.account_code, amount: Number(r.amount), isDeposit: r.isDeposit })),
       period: { from, to },
       filters: { tier, account_code, q },
       tierLabel: 'Client'
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
     Compte: r.account_code,
     Montant: Number(r.amount).toString(),
     Devise: r.currency,
+    Caution: r.isDeposit ? 'Oui' : 'Non',
   }));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);

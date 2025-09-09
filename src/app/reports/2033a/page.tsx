@@ -1,5 +1,4 @@
 import { auth } from '@/lib/auth/core';
-import { getUserRole } from '@/lib/auth';
 import { compute2033A } from '@/lib/accounting/compute2033a';
 
 export const dynamic = 'force-dynamic';
@@ -7,18 +6,18 @@ export const dynamic = 'force-dynamic';
 export default async function C2033APage({ searchParams }: { searchParams: Promise<Record<string,string|string[]|undefined>> }) {
   const sp = await searchParams;
   const yearStr = sp.year as string | undefined;
-  const q = sp.q as string | undefined;
+  const q = (sp.q as string | undefined) || undefined;
   const year = yearStr ? parseInt(yearStr,10) : new Date().getFullYear();
   const session = await auth();
   const user = session?.user;
   if (!user) return <div className="p-8">Non authentifié</div>;
-  if (getUserRole(user) !== 'admin') return <div className="p-8">Accès administrateur requis</div>;
   const d = await compute2033A({ userId: user.id, year, q });
-  const balanceOK = d.actif_total === d.capitaux_propres_equilibrage;
+  const totalPassif = d.deposits_held + d.capitaux_propres_equilibrage;
+  const balanceOK = d.actif_total === totalPassif;
   return <main className="p-6 max-w-4xl mx-auto space-y-6">
     <header className="flex items-center justify-between">
       <div>
-        <h1 className="text-2xl font-semibold">Bilan simplifié 2033-A (v1)</h1>
+        <h1 className="text-2xl font-semibold">Bilan simplifié 2033-A</h1>
         <p className="text-sm text-muted-foreground">Année {year}</p>
       </div>
       <div className="flex gap-2">
@@ -57,10 +56,11 @@ export default async function C2033APage({ searchParams }: { searchParams: Promi
         <h2 className="font-semibold mb-3">Passif</h2>
         <table className="w-full">
           <tbody>
+            <tr><td className="py-1 pr-4">Cautions détenues</td><td className="py-1 text-right tabular-nums">{d.deposits_held.toFixed(2)}</td></tr>
             <tr><td className="py-1 pr-4">Capitaux propres (équilibrage v1)</td><td className="py-1 text-right tabular-nums">{d.capitaux_propres_equilibrage.toFixed(2)}</td></tr>
           </tbody>
           <tfoot>
-            <tr className="font-semibold border-t"><td className="py-2 pr-4">Total Passif</td><td className="py-2 text-right tabular-nums">{d.capitaux_propres_equilibrage.toFixed(2)}</td></tr>
+            <tr className="font-semibold border-t"><td className="py-2 pr-4">Total Passif</td><td className="py-2 text-right tabular-nums">{totalPassif.toFixed(2)}</td></tr>
           </tfoot>
         </table>
       </div>
