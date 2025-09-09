@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const UUID = z.string().uuid();
 const YEAR = z.coerce.number().int().min(2000).max(2100);
+const SCOPE = z.enum(["user", "property"]).default("user");
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
   const p =
     searchParams.get("property") || searchParams.get("propertyId") || undefined;
   const y = searchParams.get("year") ?? undefined;
+  const s = searchParams.get("scope") ?? undefined;
 
   if (!p) return new Response("BAD_REQUEST: property requis", { status: 400 });
   const idParse = UUID.safeParse(p);
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest) {
     return new Response("BAD_REQUEST: year invalide", { status: 400 });
   const propertyId = idParse.data;
   const year = yearParse.data;
+  const scope = SCOPE.parse(s ?? "user");
 
   // Propriété et contrôle multi-tenant
   const property = await prisma.property.findUnique({
@@ -44,11 +47,17 @@ export async function GET(req: NextRequest) {
   const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
   const entries = await prisma.journalEntry.findMany({
-    where: { user_id: user.id, date: { gte: start, lte: end } },
+    where:
+      scope === "property"
+        ? { user_id: user.id, propertyId, date: { gte: start, lte: end } }
+        : { user_id: user.id, date: { gte: start, lte: end } },
     orderBy: { date: "asc" },
   });
   const assets = await prisma.asset.findMany({
-    where: { user_id: user.id, acquisition_date: { lte: end } },
+    where:
+      scope === "property"
+        ? { user_id: user.id, propertyId, acquisition_date: { lte: end } }
+        : { user_id: user.id, acquisition_date: { lte: end } },
     orderBy: { acquisition_date: "asc" },
   });
 

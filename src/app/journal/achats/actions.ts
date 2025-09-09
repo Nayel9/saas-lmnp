@@ -13,6 +13,7 @@ const entrySchema = z.object({
   account_code: z.string().min(1),
   amount: z.string().refine((v) => !isNaN(parseFloat(v)), "Montant invalide"),
   currency: z.string().default("EUR"),
+  propertyId: z.string().uuid(),
 });
 
 export type EntryFormData = z.infer<typeof entrySchema>;
@@ -32,11 +33,16 @@ export async function createEntry(formData: FormData) {
       error: parsed.error.flatten().formErrors.join(", "),
     } as const;
   const userId = await getUserId();
-  const { date, designation, tier, account_code, amount, currency } =
+  const { date, designation, tier, account_code, amount, currency, propertyId } =
     parsed.data;
   // Validation catalogue: si code présent mais non autorisé pour achats (et autorisé pour ventes) => rejet
   if (isAllowed(account_code, "vente") && !isAllowed(account_code, "achat")) {
     return { ok: false, error: "Compte réservé aux ventes" } as const;
+  }
+  // Vérifie l'appartenance du bien
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== userId) {
+    return { ok: false, error: "Bien invalide" } as const;
   }
   const created = await prisma.journalEntry.create({
     data: {
@@ -48,6 +54,7 @@ export async function createEntry(formData: FormData) {
       account_code,
       amount: parseFloat(amount),
       currency,
+      propertyId,
     },
   });
   revalidatePath("/journal/achats");
@@ -59,13 +66,17 @@ export async function updateEntry(formData: FormData) {
   if (!parsed.success || !parsed.data.id)
     return { ok: false, error: "Validation" };
   const userId = await getUserId();
-  const { id, date, designation, tier, account_code, amount, currency } =
+  const { id, date, designation, tier, account_code, amount, currency, propertyId } =
     parsed.data;
   const existing = await prisma.journalEntry.findUnique({ where: { id } });
   if (!existing || existing.user_id !== userId)
     return { ok: false, error: "Introuvable" };
   if (isAllowed(account_code, "vente") && !isAllowed(account_code, "achat")) {
     return { ok: false, error: "Compte réservé aux ventes" };
+  }
+  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!prop || prop.user_id !== userId) {
+    return { ok: false, error: "Bien invalide" };
   }
   await prisma.journalEntry.update({
     where: { id },
@@ -76,6 +87,7 @@ export async function updateEntry(formData: FormData) {
       account_code,
       amount: parseFloat(amount),
       currency,
+      propertyId,
     },
   });
   revalidatePath("/journal/achats");

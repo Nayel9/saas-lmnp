@@ -50,15 +50,29 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 
 ## Synthèse
 
+### Portée (Utilisateur | Bien)
+
+- Tu peux choisir la portée des agrégations: globale (Utilisateur) ou par Bien.
+- UI: sélecteur “Portée” sur Dashboard (mensuel) et Synthèse (Résultat, Bilan).
+- API: ajoute `scope=user` (défaut) ou `scope=property` aux endpoints:
+  - `/api/dashboard/monthly?property=<uuid>&year=YYYY&month=MM&scope=user|property`
+  - `/api/synthesis/income-statement?property=<uuid>&year=YYYY&scope=user|property`
+  - `/api/synthesis/balance?property=<uuid>&year=YYYY&scope=user|property`
+  - Exports: `/api/synthesis/export/{csv|pdf}?property=<uuid>&year=YYYY&scope=user|property`
+- Détails calcul:
+  - scope=user: agrège le journal complet (ventes hors cautions, achats) + assets de l’utilisateur.
+  - scope=property: agrège par bien (Income/Expense, Amortization liés au bien, assets liés au bien).
+  - Note: les écritures du journal et les immobilisations doivent être reliées à un bien (`propertyId`) pour que le mode "Bien" reflète fidèlement tes données.
+
 ### Compte de résultat (simple)
 
-- API: `GET /api/synthesis/income-statement?property=<uuid>&year=YYYY`
+- API: `GET /api/synthesis/income-statement?property=<uuid>&year=YYYY[&scope=user|property]`
 - Page: `/synthesis?tab=result` (sélecteurs Bien + Année)
 - Calcul: Revenus (ventes hors cautions) – Dépenses (achats hors 6811) – Amortissements (6811)
 
 ### Bilan (simple)
 
-- API: `GET /api/synthesis/balance?property=<uuid>&year=YYYY`
+- API: `GET /api/synthesis/balance?property=<uuid>&year=YYYY[&scope=user|property]`
 - Page: `/synthesis?tab=balance` (sélecteurs Bien + Année)
 - Calculs:
   - VNC (immobilisations nettes) = Σ (coût – amort cumulé ≤ 31/12)
@@ -107,8 +121,8 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 
 - UI: depuis la page `/synthesis` (onglet Résultat ou Bilan) → boutons “Exporter PDF” et “Exporter CSV”.
 - Endpoints:
-  - PDF: `GET /api/synthesis/export/pdf?property=<uuid>&year=YYYY`
-  - CSV (ZIP): `GET /api/synthesis/export/csv?property=<uuid>&year=YYYY`
+  - PDF: `GET /api/synthesis/export/pdf?property=<uuid>&year=YYYY[&scope=user|property]`
+  - CSV (ZIP): `GET /api/synthesis/export/csv?property=<uuid>&year=YYYY[&scope=user|property]`
 - PDF (A4 portrait):
   - En-tête: nom du bien, année, date d’édition
   - Compte de résultat (4 lignes): Revenus, Dépenses, Amortissements, Résultat
@@ -155,3 +169,7 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - Bannière d’aide affichée si `amortissements > (revenus - dépenses)` (EBE)
   - Bouton “J’ai compris” (persistance locale par bien + année)
   - Icône/info-bulle “ℹ️ LMNP” si la condition n’est pas remplie
+- [2025-09-09] Synthèse : sélection de portée (Utilisateur | Bien)
+  - UI: sélecteur sur Dashboard et Synthèse (Résultat/Bilan)
+  - API: prise en charge du paramètre `scope=user|property` (+ exports CSV/PDF)
+  - Schéma Prisma: `propertyId` sur `journal_entries` et `assets` (optionnel)

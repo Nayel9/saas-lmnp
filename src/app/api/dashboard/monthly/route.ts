@@ -13,6 +13,7 @@ const MONTH = z
   .int()
   .min(1)
   .max(12);
+const SCOPE = z.enum(["user", "property"]).default("user");
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
   const p = searchParams.get("property");
   const y = searchParams.get("year");
   const m = searchParams.get("month");
+  const s = searchParams.get("scope") ?? undefined;
 
   const idParse = UUID.safeParse(p);
   if (!idParse.success)
@@ -41,6 +43,7 @@ export async function GET(req: NextRequest) {
   const propertyId = idParse.data;
   const year = yearParse.data;
   const month = monthParse.data; // 1..12
+  const scope = SCOPE.parse(s ?? "user");
 
   // Propriété appartient à l'utilisateur ?
   const property = await prisma.property.findUnique({ where: { id: propertyId } });
@@ -51,27 +54,58 @@ export async function GET(req: NextRequest) {
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 1)); // exclusif
 
-  const [incomeAgg, expenseAgg] = await Promise.all([
-    prisma.income.aggregate({
-      _sum: { amount: true },
-      where: {
-        user_id: user.id,
-        propertyId,
-        date: { gte: start, lt: end },
-      },
-    }),
-    prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: {
-        user_id: user.id,
-        propertyId,
-        date: { gte: start, lt: end },
-      },
-    }),
-  ]);
+  let incoming: number;
+  let outgoing: number;
 
-  const incoming = round2(Number(incomeAgg._sum.amount || 0));
-  const outgoing = round2(Number(expenseAgg._sum.amount || 0));
+  if (scope === "user") {
+    const [incomeAgg, expenseAgg] = await Promise.all([
+      prisma.journalEntry.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: user.id,
+          type: "vente",
+          isDeposit: false,
+          date: { gte: start, lt: end },
+        },
+      }),
+      prisma.journalEntry.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: user.id,
+          type: "achat",
+          date: { gte: start, lt: end },
+        },
+      }),
+    ]);
+    incoming = round2(Number(incomeAgg._sum.amount || 0));
+    outgoing = round2(Number(expenseAgg._sum.amount || 0));
+  } else {
+    // scope === "property": calcul sur journalEntry par bien
+    const [incomeAgg, expenseAgg] = await Promise.all([
+      prisma.journalEntry.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: user.id,
+          propertyId,
+          type: "vente",
+          isDeposit: false,
+          date: { gte: start, lt: end },
+        },
+      }),
+      prisma.journalEntry.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: user.id,
+          propertyId,
+          type: "achat",
+          date: { gte: start, lt: end },
+        },
+      }),
+    ]);
+    incoming = round2(Number(incomeAgg._sum.amount || 0));
+    outgoing = round2(Number(expenseAgg._sum.amount || 0));
+  }
+
   const result = round2(incoming - outgoing);
 
   const monthKey = `${year}-${String(month).padStart(2, "0")}`;
@@ -82,8 +116,7 @@ export async function GET(req: NextRequest) {
   const amortPosted = Boolean(amortExists);
 
   return new Response(
-    JSON.stringify({ incoming, outgoing, result, amortPosted }),
+    JSON.stringify({ incoming, outgoing, result, amortPosted, scope }),
     { headers: { "Content-Type": "application/json" } },
   );
 }
-

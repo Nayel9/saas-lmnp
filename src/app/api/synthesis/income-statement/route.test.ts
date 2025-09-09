@@ -62,7 +62,13 @@ vi.mock("@/lib/prisma", () => {
       return [];
     }),
   };
-  return { prisma: { property, journalEntry, amortization } };
+  const income = {
+    aggregate: vi.fn(async () => ({ _sum: { amount: 2000 } })),
+  };
+  const expense = {
+    aggregate: vi.fn(async () => ({ _sum: { amount: 800 } })),
+  };
+  return { prisma: { property, journalEntry, amortization, income, expense } };
 });
 
 const P1 = "11111111-1111-1111-1111-111111111111";
@@ -85,6 +91,20 @@ describe("GET /api/synthesis/income-statement", () => {
     expect(body.depenses).toBe(300);
     expect(body.amortissements).toBe(150);
     expect(body.resultat).toBe(550);
+  });
+  it("mode scope=property: utilise Income/Expense par bien", async () => {
+    const res = await GET(
+      makeReq(
+        `http://test/api/synthesis/income-statement?property=${P1}&year=2025&scope=property`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // revenus=2000, depenses=800 depuis les aggregates mockés, amort=150 => résultat 1050
+    expect(body.revenus).toBe(2000);
+    expect(body.depenses).toBe(800);
+    expect(body.amortissements).toBe(150);
+    expect(body.resultat).toBe(1050);
   });
   it("contrôle multi-tenant: forbidden si propriété autre user", async () => {
     const res = await GET(

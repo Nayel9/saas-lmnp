@@ -16,11 +16,12 @@ vi.mock("@/lib/prisma", () => {
       return null;
     }),
   };
-  const income = {
-    aggregate: vi.fn(async () => ({ _sum: { amount: 1200 } })),
-  };
-  const expense = {
-    aggregate: vi.fn(async () => ({ _sum: { amount: 450 } })),
+  const journalEntry = {
+    aggregate: vi.fn(async ({ where }: { where: { type?: string } }) => {
+      if (where?.type === "vente") return { _sum: { amount: 1200 } };
+      if (where?.type === "achat") return { _sum: { amount: 450 } };
+      return { _sum: { amount: 0 } };
+    }),
   };
   const amortization = {
     findFirst: vi.fn(async ({ where }: { where: { note?: { contains?: string } } }) => {
@@ -28,7 +29,7 @@ vi.mock("@/lib/prisma", () => {
       return null;
     }),
   };
-  return { prisma: { property, income, expense, amortization } };
+  return { prisma: { property, journalEntry, amortization } };
 });
 
 const P1 = "11111111-1111-1111-1111-111111111111";
@@ -45,7 +46,7 @@ describe("GET /api/dashboard/monthly", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ incoming: 1200, outgoing: 450, result: 750, amortPosted: true });
+    expect(body).toMatchObject({ incoming: 1200, outgoing: 450, result: 750, amortPosted: true, scope: "user" });
   });
   it("amortPosted=false quand aucune écriture", async () => {
     const res = await GET(
@@ -74,4 +75,3 @@ describe("GET /api/dashboard/monthly", () => {
     expect(r3.status).toBe(400);
   });
 });
-

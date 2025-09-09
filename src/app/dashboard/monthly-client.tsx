@@ -21,6 +21,9 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
   const [propertyId, setPropertyId] = useState<string>(
     search.get("property") || properties[0]?.id || "",
   );
+  const [scope, setScope] = useState<"user" | "property">(
+    search.get("scope") === "property" ? "property" : "user",
+  );
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const currentMonth = useMemo(() => new Date().getMonth() + 1, []);
   const [year, setYear] = useState<number>(() => parseInt(search.get("year") || String(currentYear), 10));
@@ -49,11 +52,12 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
     if (propertyId) p.set("property", propertyId);
     if (year) p.set("year", String(year));
     if (month) p.set("month", String(month).padStart(2, "0"));
+    if (scope) p.set("scope", scope);
     return p.toString();
-  }, [propertyId, year, month]);
+  }, [propertyId, year, month, scope]);
 
   useEffect(() => {
-    const url = `/${q ? `?${q}` : ""}`;
+    const url = `/dashboard${q ? `?${q}` : ""}`;
     router.replace(url, { scroll: false });
   }, [q, router]);
 
@@ -67,7 +71,7 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
       setError(null);
       try {
         const res = await fetch(
-          `/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, "0")}`,
+          `/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, "0")}&scope=${scope}`,
           { cache: "no-store" },
         );
         if (!res.ok) {
@@ -91,11 +95,23 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
       }
     }
     load();
-  }, [propertyId, year, month]);
+  }, [propertyId, year, month, scope]);
 
   return (
     <section className="space-y-4">
-      <form className="grid sm:grid-cols-3 gap-3 items-end">
+      <form className="grid sm:grid-cols-4 gap-3 items-end">
+        <label className="space-y-1">
+          <div className="text-sm font-medium">Portée</div>
+          <select
+            aria-label="Portée"
+            value={scope}
+            onChange={(e) => setScope(e.target.value === "property" ? "property" : "user")}
+            className="input w-full"
+          >
+            <option value="user">Utilisateur (tous biens)</option>
+            <option value="property">Bien</option>
+          </select>
+        </label>
         <label className="space-y-1">
           <div className="text-sm font-medium">Bien</div>
           <select
@@ -181,7 +197,7 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
                         toast.success("Amortissement posté");
                         // refetch
                         const res = await fetch(
-                          `/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, "0")}`,
+                          `/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, "0")}&scope=${scope}`,
                           { cache: "no-store" },
                         );
                         const j = await res.json();

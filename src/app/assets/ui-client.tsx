@@ -28,6 +28,7 @@ const schema = z.object({
         .includes(v),
     "Compte immobilisation invalide",
   ),
+  propertyId: z.string().uuid({ message: "Bien requis" }),
 });
 
 async function presign(assetId: string, file: File) {
@@ -109,7 +110,11 @@ interface ActionResult {
   id?: string;
 }
 
-export function AddAssetButton() {
+export function AddAssetButton({
+  properties,
+}: {
+  properties: { id: string; label: string }[];
+}) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -118,6 +123,9 @@ export function AddAssetButton() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const router = useRouter();
+  const [selectedProperty, setSelectedProperty] = useState<string>(
+    properties[0]?.id || "",
+  );
 
   const onFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -157,6 +165,7 @@ export function AddAssetButton() {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -196,6 +205,19 @@ export function AddAssetButton() {
           <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
             <h2 className="text-lg font-medium">Nouvelle immobilisation</h2>
             <form onSubmit={onSubmit} className="space-y-3">
+              <select
+                name="propertyId"
+                className="input w-full"
+                value={selectedProperty}
+                onChange={(e) => setSelectedProperty(e.target.value)}
+                required
+              >
+                {properties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
               <input
                 name="label"
                 placeholder="Libellé"
@@ -303,20 +325,26 @@ interface EditProps {
     duration_years: number;
     acquisition_date: string | Date;
     account_code: string;
+    propertyId?: string;
   };
+  properties: { id: string; label: string }[];
 }
-export function EditAssetButton({ asset }: EditProps) {
+export function EditAssetButton({ asset, properties }: EditProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [accountCode, setAccountCode] = useState(asset.account_code || "");
   const formValid = useMemo(() => !!accountCode, [accountCode]);
+  const [selectedProperty, setSelectedProperty] = useState<string>(
+    asset.propertyId || properties[0]?.id || "",
+  );
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
     fd.set("id", asset.id);
+    if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -345,6 +373,19 @@ export function EditAssetButton({ asset }: EditProps) {
           <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
             <h2 className="text-lg font-medium">Modifier immobilisation</h2>
             <form onSubmit={onSubmit} className="space-y-3">
+              <select
+                name="propertyId"
+                className="input w-full"
+                value={selectedProperty}
+                onChange={(e) => setSelectedProperty(e.target.value)}
+                required
+              >
+                {properties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
               <input
                 name="label"
                 defaultValue={asset.label}

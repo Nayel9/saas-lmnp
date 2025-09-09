@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const UUID = z.string().uuid();
 const YEAR = z.coerce.number().int().min(2000).max(2100);
+const SCOPE = z.enum(["user", "property"]).default("user");
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   const p =
     searchParams.get("property") || searchParams.get("propertyId") || undefined;
   const y = searchParams.get("year") ?? undefined;
+  const s = searchParams.get("scope") ?? undefined;
   if (!p) return new Response("BAD_REQUEST: property requis", { status: 400 });
   const idParse = UUID.safeParse(p);
   if (!idParse.success)
@@ -27,6 +29,7 @@ export async function GET(req: NextRequest) {
     return new Response("BAD_REQUEST: year invalide", { status: 400 });
   const propertyId = idParse.data;
   const year = yearParse.data;
+  const scope = SCOPE.parse(s ?? "user");
 
   // Contrôle d’appartenance
   const property = await prisma.property.findUnique({
@@ -40,13 +43,19 @@ export async function GET(req: NextRequest) {
 
   // Assets jusqu’au 31/12
   const assets = await prisma.asset.findMany({
-    where: { user_id: user.id, acquisition_date: { lte: end } },
+    where:
+      scope === "property"
+        ? { user_id: user.id, propertyId, acquisition_date: { lte: end } }
+        : { user_id: user.id, acquisition_date: { lte: end } },
     orderBy: { acquisition_date: "asc" },
   });
 
   // Écritures de l’année (achat/vente)
   const entries = await prisma.journalEntry.findMany({
-    where: { user_id: user.id, date: { gte: start, lte: end } },
+    where:
+      scope === "property"
+        ? { user_id: user.id, propertyId, date: { gte: start, lte: end } }
+        : { user_id: user.id, date: { gte: start, lte: end } },
   });
 
   const assetsSimple = assets.map((a) => ({
@@ -71,7 +80,7 @@ export async function GET(req: NextRequest) {
     entries: entriesSimple,
     year,
   });
-  // Retourner le résultat (contient year) et propertyId sans duplication
+  // Retourne le résultat (contient year) et propertyId
   return new Response(JSON.stringify({ propertyId, ...result }), {
     headers: { "Content-Type": "application/json" },
   });
