@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import TWSpinner from '@/components/ui/loader/spinner';
+import { toast } from 'sonner';
 
 type PropertyOpt = { id: string; label: string };
 
@@ -92,6 +93,44 @@ export default function BalanceClient({ properties, defaultYear }: { properties:
         )}
       </form>
 
+      {/* Barre d'actions Export */}
+      <div className="flex gap-3 items-center">
+        <button
+          type="button"
+          className="btn-outline text-sm"
+          disabled={!propertyId}
+          onClick={async ()=>{
+            if (!propertyId) { toast.error('Sélectionne un bien'); return; }
+            const q = new URLSearchParams({ property: propertyId, year: String(year) });
+            const url = `/api/synthesis/export/pdf?${q.toString()}`;
+            const t = toast('Export PDF en cours…');
+            try {
+              const a = document.createElement('a'); a.href = url; a.download = '';
+              document.body.appendChild(a); a.click(); a.remove();
+              toast.success('Export prêt');
+            } catch { toast.error('Export échoué'); }
+            finally { toast.dismiss(t); }
+          }}
+        >Exporter PDF</button>
+        <button
+          type="button"
+          className="btn-outline text-sm"
+          disabled={!propertyId}
+          onClick={async ()=>{
+            if (!propertyId) { toast.error('Sélectionne un bien'); return; }
+            const q = new URLSearchParams({ property: propertyId, year: String(year) });
+            const url = `/api/synthesis/export/csv?${q.toString()}`;
+            const t = toast('Export CSV en cours…');
+            try {
+              const a = document.createElement('a'); a.href = url; a.download = '';
+              document.body.appendChild(a); a.click(); a.remove();
+              toast.success('Export prêt');
+            } catch { toast.error('Export échoué'); }
+            finally { toast.dismiss(t); }
+          }}
+        >Exporter CSV</button>
+      </div>
+
       {!propertyId && <div className="text-sm text-muted-foreground">Sélectionne un bien</div>}
 
       {propertyId && (
@@ -144,4 +183,3 @@ export default function BalanceClient({ properties, defaultYear }: { properties:
     </div>
   );
 }
-

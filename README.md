@@ -59,6 +59,21 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - Autres dettes = 0 (placeholder)
 - Retour JSON: `{ actif: { vnc, treso, total }, passif: { cautions, dettes, total }, ecart }`
 
+### Exports (PDF/CSV)
+- UI: depuis la page `/synthesis` (onglet Résultat ou Bilan) → boutons “Exporter PDF” et “Exporter CSV”.
+- Endpoints:
+  - PDF: `GET /api/synthesis/export/pdf?property=<uuid>&year=YYYY`
+  - CSV (ZIP): `GET /api/synthesis/export/csv?property=<uuid>&year=YYYY`
+- PDF (A4 portrait):
+  - En-tête: nom du bien, année, date d’édition
+  - Compte de résultat (4 lignes): Revenus, Dépenses, Amortissements, Résultat
+  - Bilan (simple): Actif (VNC, Trésorerie) / Passif (Cautions, Dettes=0)
+  - Montants formatés en EUR (locale fr-FR)
+- CSV (ZIP):
+  - income_statement.csv: colonnes `label,amount` avec lignes `revenues, expenses, depreciation, result`
+  - balance_sheet.csv: colonnes `section,label,amount` avec lignes `ASSET,vnc_total`, `ASSET,cash_mvp`, `LIABILITY,deposits_held`, `LIABILITY,payables_placeholder`
+  - Encodage UTF‑8, séparateur `,`, décimales `.`
+
 ## Scripts
 - Dév: `pnpm dev`
 - Build: `pnpm build`
@@ -84,3 +99,7 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - API `/api/synthesis/balance` + UI `/synthesis?tab=balance`
   - VNC (assets), trésorerie MVP, cautions détenues, totaux Actif/Passif, écart affiché
   - Tests unitaires + intégration
+- [2025-09-09] Synthèse : export PDF/CSV
+  - Endpoints `/api/synthesis/export/pdf` et `/api/synthesis/export/csv`
+  - UI boutons Export sur Synthèse (PDF/CSV)
+  - Tests unitaires + intégration (PDF/ZIP)
