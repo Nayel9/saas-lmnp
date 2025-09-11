@@ -112,7 +112,7 @@ export default function DashboardTodoClient() {
                         <div className="text-muted-foreground text-xs">{new Date(r.date).toLocaleDateString("fr-FR")} · {formatEUR(r.amount)}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Link className="btn" href={openHref}>Ouvrir</Link>
+                        <Link className="btn-ghost" href={openHref}>Ouvrir</Link>
                         <button
                           className="btn-primary"
                           onClick={async () => {
@@ -197,9 +197,9 @@ export default function DashboardTodoClient() {
                         <div className="text-muted-foreground text-xs">{new Date(r.date).toLocaleDateString("fr-FR")} · {formatEUR(r.amount)}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Link className="btn" href={openHref}>Ouvrir</Link>
+                        <Link className="btn-primary" href={openHref}>Ouvrir</Link>
                         <button
-                          className="btn"
+                          className="btn-ghost"
                           onClick={async () => {
                             const t = toast("Annulation en cours…");
                             try {
