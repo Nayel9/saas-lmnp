@@ -11,7 +11,7 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 - Synthèse : compte de résultat simple
   - Revenus = ventes hors cautions (isDeposit=true exclues)
   - Dépenses = achats hors comptes d’amortissement
-  - Amortissements = dotations (comptes 6811\*)
+  - Amortissements = dotations (comptes 6811*)
   - Résultat = Revenus – Dépenses – Amortissements
 - Synthèse : bilan simple (nouveau)
   - ACTIF: Immobilisations nettes (VNC), Trésorerie (MVP: ventes hors cautions – achats sur l’année)
@@ -37,16 +37,44 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 - Provider actif: Credentials (email + mot de passe hashé bcrypt)
 - Inscription: `POST /api/users` (zod + bcrypt)
 - Session: JWT (`session.user.id`, `role`, `plan`)
-- Pages protégées: `/dashboard`, `/assets`, `/journal/*`, `/reports/*`, `/synthesis`, `/admin` (rôle admin)
-
-## Stockage S3 (pièces jointes)
-
-Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
-
+- [2025-09-11] Corrections et améliorations UX
+  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)
+  - Amélioration: Aperçu pièces jointes (overlay) — taille et message en cas d'absence de pièce
+  - Ajout d'une action d'annulation (undo) pour les marquages rapides (toast avec bouton Annuler)
+  - Mise à jour README pour la bannière LMNP et la section "À faire"
+- [2025-09-11] Paramètres : toggle TVA (par bien)
+  - Champ `vatEnabled` sur `Property` (défaut=false)
+  - UI `/settings/accounting` avec switch TVA et contrôle d’appartenance
+  - UI journaux conditionnelle (HT/TVA/TTC visibles seulement quand ON)
+  - Persistance `amountHT`, `vatRate`, `vatAmount`, `amountTTC` (avec `amount=amountTTC`)
+  - Limitation MVP: agrégations inchangées (sur `amount` TTC)
 - Upload direct: presigned POST (`/api/uploads/presign`)
 - Download/preview: URLs signées
 - Variables requises: S3_BUCKET et S3_REGION ou S3_ENDPOINT; credentials recommandés
 - Mode mock local: storageKey préfixé `mock/` lit depuis `.uploads/`
+
+## Paramètres > TVA (nouveau)
+
+- Cible LMNP: TVA désactivée par défaut (non applicable en général).
+- Portée: par bien (Property) via champ `vatEnabled` (boolean, défaut=false).
+- Page: `/settings/accounting` → switch “Activer la TVA pour ce bien”.
+  - Aide: “LMNP : la TVA est généralement non applicable. Activez uniquement si votre activité le nécessite.”
+  - Sauvegarde côté serveur (zod + contrôle d’appartenance du bien).
+- Effet UI dans les journaux Achats/Ventes:
+  - TVA OFF → l’UI masque les champs HT/TVA; on saisit seulement le Montant TTC (comportement historique).
+  - TVA ON → l’UI affiche Montant HT, Taux TVA (%), Montant TVA, Montant TTC avec calculs auto:
+    - montantTTC = montantHT × (1 + taux/100)
+    - modification de TTC → recalcul HT/TVA (arrondis 2 déc).
+- Persistance (Prisma, modèle JournalEntry):
+  - Champs optionnels ajoutés: `amountHT?`, `vatRate?`, `vatAmount?`, `amountTTC?`.
+  - TVA OFF → on remplit seulement `amount` (≈ TTC) et laisse `amountHT`/`vat*` à null.
+  - TVA ON → on remplit `amountHT`, `vatRate`, `vatAmount`, `amountTTC` et on synchronise `amount = amountTTC`.
+- Validation (MVP):
+  - `vatRate` ∈ [0, 100].
+  - Cohérence `amountTTC ≈ amountHT × (1 + rate/100)` (tolérance d’arrondi 2 déc.).
+  - Champs requis uniquement quand `vatEnabled=true`.
+- Limitation MVP:
+  - Les agrégations (Résultat, Bilan, Dashboard, exports) continuent d’utiliser `amount` (TTC). Pas de déclaration TVA.
 
 ## Dashboard
 

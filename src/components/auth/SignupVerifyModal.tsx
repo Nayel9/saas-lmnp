@@ -30,6 +30,7 @@ export function SignupVerifyModal({
   const [polling, setPolling] = useState(false);
   const pollTimeoutRef = useRef<number | null>(null);
   const pollStartedRef = useRef<number | null>(null);
+  const rafIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!opened) return;
@@ -117,10 +118,26 @@ export function SignupVerifyModal({
 
   useEffect(() => {
     if (opened) {
-      requestAnimationFrame(() => setAnimate(true));
+      // annule un éventuel rAF précédent avant d'en planifier un nouveau
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      rafIdRef.current = requestAnimationFrame(() => setAnimate(true));
     } else {
       setAnimate(false);
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     }
+    return () => {
+      // cleanup en cas de démontage rapide
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
   }, [opened]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useRef, useState, useTransition } from "react";
+import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { formatDateISO } from "@/lib/format";
@@ -8,6 +8,7 @@ import { createEntry, updateEntry } from "./actions";
 import { AccountCodeSelector } from "@/components/AccountCodeSelector";
 import { toast } from "sonner";
 import { Spinner } from "@/components/SubmitButton";
+import { computeFromHT, computeFromTTC } from "@/lib/vat";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -95,9 +96,48 @@ export default function JournalAchatsClient({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const [selectedProperty, setSelectedProperty] = useState<string>(
-    properties[0]?.id || "",
-  );
+  const [selectedProperty, setSelectedProperty] = useState<string>(properties[0]?.id || "");
+  const [vatOn, setVatOn] = useState<boolean>(false);
+
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      if (!selectedProperty) return setVatOn(false);
+      try {
+        const res = await fetch(`/api/settings/vat?property=${encodeURIComponent(selectedProperty)}`, { cache: "no-store" });
+        if (!res.ok) { setVatOn(false); return; }
+        const j = await res.json();
+        if (!abort) setVatOn(Boolean(j.vatEnabled));
+      } catch {
+        if (!abort) setVatOn(false);
+      }
+    })();
+    return () => { abort = true; };
+  }, [selectedProperty]);
+
+  const [ht, setHt] = useState<string>("");
+  const [rate, setRate] = useState<string>("20");
+  const [ttc, setTtc] = useState<string>("");
+  const [tva, setTva] = useState<string>("");
+
+  function recalcFromHT(newHt: string, newRate: string) {
+    const h = parseFloat(newHt);
+    const r = parseFloat(newRate);
+    if (isFinite(h) && isFinite(r)) {
+      const c = computeFromHT(h, r);
+      setTva(c.tva.toFixed(2));
+      setTtc(c.ttc.toFixed(2));
+    }
+  }
+  function recalcFromTTC(newTtc: string, newRate: string) {
+    const t = parseFloat(newTtc);
+    const r = parseFloat(newRate);
+    if (isFinite(t) && isFinite(r)) {
+      const c = computeFromTTC(t, r);
+      setHt(c.ht.toFixed(2));
+      setTva(c.tva.toFixed(2));
+    }
+  }
 
   const onFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -138,6 +178,11 @@ export default function JournalAchatsClient({
     const fd = new FormData(e.currentTarget);
     (fd as FormData).set("currency", "EUR");
     if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
+    if (vatOn) {
+      // Alimente 'amount' avec TTC pour satisfaire le schéma et la compat
+      const effectiveTtc = (fd.get("amountTTC") as string) || ttc || "";
+      if (effectiveTtc) fd.set("amount", effectiveTtc);
+    }
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -172,6 +217,11 @@ export default function JournalAchatsClient({
         onClick={() => {
           setError(null);
           setOpen(true);
+          // reset TVA state sur ouverture
+          setHt("");
+          setRate("20");
+          setTtc("");
+          setTva("");
         }}
       >
         Ajouter
@@ -211,11 +261,65 @@ export default function JournalAchatsClient({
                 className="input w-full"
               />
               <AccountCodeSelector typeJournal="achat" />
-              <input
-                name="amount"
-                placeholder="Montant"
-                className="input w-full"
-              />
+              {!vatOn && (
+                <input name="amount" placeholder="Montant TTC" className="input w-full" />
+              )}
+              {vatOn && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Montant HT</div>
+                    <input
+                      name="amountHT"
+                      value={ht}
+                      onChange={(e) => {
+                        setHt(e.target.value);
+                        recalcFromHT(e.target.value, rate);
+                      }}
+                      placeholder="0.00"
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Taux TVA (%)</div>
+                    <input
+                      name="vatRate"
+                      value={rate}
+                      onChange={(e) => {
+                        setRate(e.target.value);
+                        if (ht) recalcFromHT(ht, e.target.value);
+                        else if (ttc) recalcFromTTC(ttc, e.target.value);
+                      }}
+                      placeholder="20"
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TTC</div>
+                    <input
+                      name="amountTTC"
+                      value={ttc}
+                      onChange={(e) => {
+                        setTtc(e.target.value);
+                        recalcFromTTC(e.target.value, rate);
+                      }}
+                      placeholder="0.00"
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TVA (auto)</div>
+                    <input
+                      name="vatAmount"
+                      value={tva}
+                      readOnly
+                      className="input w-full bg-muted/50"
+                    />
+                  </label>
+                </div>
+              )}
 
               <div className="mt-2 border rounded-md p-3">
                 <div className="text-sm font-medium mb-1">Justificatifs</div>
@@ -293,118 +397,203 @@ interface EditButtonProps {
     account_code: string;
     amount: string | number;
     propertyId?: string;
+    amountHT?: number;
+    vatRate?: number;
+    vatAmount?: number;
+    amountTTC?: number;
   };
 }
 
 export function EditButton({ entry, properties }: EditButtonProps & { properties: { id: string; label: string }[] }) {
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const [selectedProperty, setSelectedProperty] = useState<string>(entry.propertyId || properties[0]?.id || "");
+   const [open, setOpen] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+   const [isPending, startTransition] = useTransition();
+   const router = useRouter();
+   const [selectedProperty, setSelectedProperty] = useState<string>(entry.propertyId || properties[0]?.id || "");
+   const [vatOn, setVatOn] = useState<boolean>(false);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    const fd = new FormData(e.currentTarget);
-    fd.set("id", entry.id);
-    if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
-    const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
-    const parsed = schema.safeParse(obj);
-    if (!parsed.success) {
-      setError(
-        "Validation: " + parsed.error.issues.map((i) => i.message).join(", "),
-      );
-      return;
-    }
-    // ...vérifs comptes...
-    startTransition(async () => {
-      const res: ActionResult = await updateEntry(fd);
-      if (!res?.ok) setError(res?.error || "Erreur inconnue");
-      else {
-        setOpen(false);
-        router.refresh();
-      }
-    });
-  }
+   useEffect(() => {
+     let abort = false;
+     (async () => {
+       if (!selectedProperty) return setVatOn(false);
+       try {
+         const res = await fetch(`/api/settings/vat?property=${encodeURIComponent(selectedProperty)}`, { cache: "no-store" });
+         if (!res.ok) { setVatOn(false); return; }
+         const j = await res.json();
+         if (!abort) setVatOn(Boolean(j.vatEnabled));
+       } catch {
+         if (!abort) setVatOn(false);
+       }
+     })();
+     return () => { abort = true; };
+   }, [selectedProperty]);
 
-  return (
-    <>
-      <button
-        className="text-xs text-brand hover:underline"
-        onClick={() => {
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        Edit
-      </button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
-            <h2 className="text-lg font-medium">Modifier écriture</h2>
-            <form onSubmit={onSubmit} className="space-y-3">
-              <select
-                name="propertyId"
-                className="input w-full"
-                value={selectedProperty}
-                onChange={(e) => setSelectedProperty(e.target.value)}
-                required
-              >
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                name="date"
-                type="date"
-                defaultValue={formatDateISO(entry.date)}
-                className="input w-full"
-              />
-              <input
-                name="designation"
-                defaultValue={entry.designation}
-                className="input w-full"
-              />
-              <input
-                name="tier"
-                defaultValue={entry.tier || ""}
-                className="input w-full"
-              />
-              <AccountCodeSelector
-                typeJournal="achat"
-                defaultValue={entry.account_code}
-              />
-              <input
-                name="amount"
-                defaultValue={entry.amount}
-                className="input w-full"
-              />
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setOpen(false)}
-                >
-                  Annuler
-                </button>
-                <button
-                  disabled={isPending}
-                  className="btn-primary inline-flex items-center gap-2"
-                >
-                  {isPending && <Spinner />}
-                  {isPending ? "Sauvegarde..." : "Mettre à jour"}
-                </button>
-              </div>
-              {error && (
-                <p className="text-xs text-[--color-danger]">{error}</p>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+   const [htE, setHtE] = useState<string>(entry.amountHT != null ? String(entry.amountHT.toFixed ? entry.amountHT.toFixed(2) : entry.amountHT) : "");
+   const [rateE, setRateE] = useState<string>(entry.vatRate != null ? String(entry.vatRate) : "20");
+   const [ttcE, setTtcE] = useState<string>(entry.amountTTC != null ? String(entry.amountTTC.toFixed ? entry.amountTTC.toFixed(2) : entry.amountTTC) : String(entry.amount));
+   const [tvaE, setTvaE] = useState<string>(entry.vatAmount != null ? String(entry.vatAmount.toFixed ? entry.vatAmount.toFixed(2) : entry.vatAmount) : "");
+
+   function recalcEFromHT(newHt: string, newRate: string) {
+     const h = parseFloat(newHt);
+     const r = parseFloat(newRate);
+     if (isFinite(h) && isFinite(r)) {
+       const c = computeFromHT(h, r);
+       setTvaE(c.tva.toFixed(2));
+       setTtcE(c.ttc.toFixed(2));
+     }
+   }
+   function recalcEFromTTC(newTtc: string, newRate: string) {
+     const t = parseFloat(newTtc);
+     const r = parseFloat(newRate);
+     if (isFinite(t) && isFinite(r)) {
+       const c = computeFromTTC(t, r);
+       setHtE(c.ht.toFixed(2));
+       setTvaE(c.tva.toFixed(2));
+     }
+   }
+
+   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+     e.preventDefault();
+     setError(null);
+     const fd = new FormData(e.currentTarget);
+     fd.set("id", entry.id);
+     if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
+     if (vatOn) {
+       const effectiveTtc = (fd.get("amountTTC") as string) || ttcE || "";
+       if (effectiveTtc) fd.set("amount", effectiveTtc);
+     }
+     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
+     const parsed = schema.safeParse(obj);
+     if (!parsed.success) {
+       setError(
+         "Validation: " + parsed.error.issues.map((i) => i.message).join(", "),
+       );
+       return;
+     }
+     // ...vérifs comptes...
+     startTransition(async () => {
+       const res: ActionResult = await updateEntry(fd);
+       if (!res?.ok) setError(res?.error || "Erreur inconnue");
+       else {
+         setOpen(false);
+         router.refresh();
+       }
+     });
+   }
+
+   return (
+     <>
+       <button
+         className="text-xs text-brand hover:underline"
+         onClick={() => {
+           setError(null);
+           setOpen(true);
+         }}
+       >
+         Edit
+       </button>
+       {open && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+           <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
+             <h2 className="text-lg font-medium">Modifier écriture</h2>
+             <form onSubmit={onSubmit} className="space-y-3">
+               <select
+                 name="propertyId"
+                 className="input w-full"
+                 value={selectedProperty}
+                 onChange={(e) => setSelectedProperty(e.target.value)}
+                 required
+               >
+                 {properties.map((p) => (
+                   <option key={p.id} value={p.id}>
+                     {p.label}
+                   </option>
+                 ))}
+               </select>
+               <input
+                 name="date"
+                 type="date"
+                 defaultValue={formatDateISO(entry.date)}
+                 className="input w-full"
+               />
+               <input
+                 name="designation"
+                 defaultValue={entry.designation}
+                 className="input w-full"
+               />
+               <input
+                 name="tier"
+                 defaultValue={entry.tier || ""}
+                 className="input w-full"
+               />
+               <AccountCodeSelector
+                 typeJournal="achat"
+                 defaultValue={entry.account_code}
+               />
+               {!vatOn && (
+                 <input name="amount" defaultValue={entry.amount} className="input w-full" />
+               )}
+               {vatOn && (
+                 <div className="grid grid-cols-2 gap-3">
+                   <label className="space-y-1">
+                     <div className="text-sm font-medium">Montant HT</div>
+                     <input
+                       name="amountHT"
+                       value={htE}
+                       onChange={(e) => { setHtE(e.target.value); recalcEFromHT(e.target.value, rateE); }}
+                       className="input w-full"
+                       inputMode="decimal"
+                     />
+                   </label>
+                   <label className="space-y-1">
+                     <div className="text-sm font-medium">Taux TVA (%)</div>
+                     <input
+                       name="vatRate"
+                       value={rateE}
+                       onChange={(e) => { setRateE(e.target.value); if (htE) recalcEFromHT(htE, e.target.value); else if (ttcE) recalcEFromTTC(ttcE, e.target.value); }}
+                       className="input w-full"
+                       inputMode="decimal"
+                     />
+                   </label>
+                   <label className="space-y-1 col-span-2">
+                     <div className="text-sm font-medium">Montant TTC</div>
+                     <input
+                       name="amountTTC"
+                       value={ttcE}
+                       onChange={(e) => { setTtcE(e.target.value); recalcEFromTTC(e.target.value, rateE); }}
+                       className="input w-full"
+                       inputMode="decimal"
+                     />
+                   </label>
+                   <label className="space-y-1 col-span-2">
+                     <div className="text-sm font-medium">Montant TVA (auto)</div>
+                     <input name="vatAmount" value={tvaE} readOnly className="input w-full bg-muted/50" />
+                   </label>
+                 </div>
+               )}
+               <div className="flex justify-end gap-2 pt-2">
+                 <button
+                   type="button"
+                   className="btn"
+                   onClick={() => setOpen(false)}
+                 >
+                   Annuler
+                 </button>
+                 <button
+                   disabled={isPending}
+                   className="btn-primary inline-flex items-center gap-2"
+                 >
+                   {isPending && <Spinner />}
+                   {isPending ? "Sauvegarde..." : "Mettre à jour"}
+                 </button>
+               </div>
+               {error && (
+                 <p className="text-xs text-[--color-danger]">{error}</p>
+               )}
+             </form>
+           </div>
+         </div>
+       )}
+     </>
+   );
+ }
