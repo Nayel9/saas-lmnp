@@ -11,7 +11,7 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 - Synthèse : compte de résultat simple
   - Revenus = ventes hors cautions (isDeposit=true exclues)
   - Dépenses = achats hors comptes d’amortissement
-  - Amortissements = dotations (comptes 6811\*)
+  - Amortissements = dotations (comptes 6811*)
   - Résultat = Revenus – Dépenses – Amortissements
 - Synthèse : bilan simple (nouveau)
   - ACTIF: Immobilisations nettes (VNC), Trésorerie (MVP: ventes hors cautions – achats sur l’année)
@@ -37,16 +37,44 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 - Provider actif: Credentials (email + mot de passe hashé bcrypt)
 - Inscription: `POST /api/users` (zod + bcrypt)
 - Session: JWT (`session.user.id`, `role`, `plan`)
-- Pages protégées: `/dashboard`, `/assets`, `/journal/*`, `/reports/*`, `/synthesis`, `/admin` (rôle admin)
-
-## Stockage S3 (pièces jointes)
-
-Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
-
+- [2025-09-11] Corrections et améliorations UX
+  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)
+  - Amélioration: Aperçu pièces jointes (overlay) — taille et message en cas d'absence de pièce
+  - Ajout d'une action d'annulation (undo) pour les marquages rapides (toast avec bouton Annuler)
+  - Mise à jour README pour la bannière LMNP et la section "À faire"
+- [2025-09-11] Paramètres : toggle TVA (par bien)
+  - Champ `vatEnabled` sur `Property` (défaut=false)
+  - UI `/settings/accounting` avec switch TVA et contrôle d’appartenance
+  - UI journaux conditionnelle (HT/TVA/TTC visibles seulement quand ON)
+  - Persistance `amountHT`, `vatRate`, `vatAmount`, `amountTTC` (avec `amount=amountTTC`)
+  - Limitation MVP: agrégations inchangées (sur `amount` TTC)
 - Upload direct: presigned POST (`/api/uploads/presign`)
 - Download/preview: URLs signées
 - Variables requises: S3_BUCKET et S3_REGION ou S3_ENDPOINT; credentials recommandés
 - Mode mock local: storageKey préfixé `mock/` lit depuis `.uploads/`
+
+## Paramètres > TVA (nouveau)
+
+- Cible LMNP: TVA désactivée par défaut (non applicable en général).
+- Portée: par bien (Property) via champ `vatEnabled` (boolean, défaut=false).
+- Page: `/settings/accounting` → switch “Activer la TVA pour ce bien”.
+  - Aide: “LMNP : la TVA est généralement non applicable. Activez uniquement si votre activité le nécessite.”
+  - Sauvegarde côté serveur (zod + contrôle d’appartenance du bien).
+- Effet UI dans les journaux Achats/Ventes:
+  - TVA OFF → l’UI masque les champs HT/TVA; on saisit seulement le Montant TTC (comportement historique).
+  - TVA ON → l’UI affiche Montant HT, Taux TVA (%), Montant TVA, Montant TTC avec calculs auto:
+    - montantTTC = montantHT × (1 + taux/100)
+    - modification de TTC → recalcul HT/TVA (arrondis 2 déc).
+- Persistance (Prisma, modèle JournalEntry):
+  - Champs optionnels ajoutés: `amountHT?`, `vatRate?`, `vatAmount?`, `amountTTC?`.
+  - TVA OFF → on remplit seulement `amount` (≈ TTC) et laisse `amountHT`/`vat*` à null.
+  - TVA ON → on remplit `amountHT`, `vatRate`, `vatAmount`, `amountTTC` et on synchronise `amount = amountTTC`.
+- Validation (MVP):
+  - `vatRate` ∈ [0, 100].
+  - Cohérence `amountTTC ≈ amountHT × (1 + rate/100)` (tolérance d’arrondi 2 déc.).
+  - Champs requis uniquement quand `vatEnabled=true`.
+- Limitation MVP:
+  - Les agrégations (Résultat, Bilan, Dashboard, exports) continuent d’utiliser `amount` (TTC). Pas de déclaration TVA.
 
 ## Dashboard
 
@@ -69,36 +97,19 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - Règles: uniquement ventes non dépôt du user; met `account_code="512"`; sans effet si déjà 512/53.
 - États UI: affiche “Rien à signaler 🎉” si aucune tâche.
 
-#### Améliorations récentes et bonnes pratiques
+### Historique rapide (nouveau)
 
-- Portée (`scope`): ajout du paramètre `scope=user|property` pour filtrer les agrégations par utilisateur ou par bien (défaut `user`).
-- Détection "non encaissé": introduction d’un statut dédié côté modèle/écriture et fallback heuristique (compte non‑trésorerie) pour réduire les faux positifs.
-- Undo: actions rapides (ex: marquer encaissé) affichent un toast avec bouton “Annuler” permettant d'inverser l'opération si cliqué rapidement.
-- Attachments / UX:
-  - Aperçu pièces jointes: overlay redimensionné, message clair si aucune pièce, spinner limité pour empêcher affichage surdimensionné.
-  - Correction du filtrage lors de la navigation vers le journal depuis un item (utilisation d’une référence lisible plutôt que l'ID brute dans l’URL de filtre).
-- Accessibilité: boutons et toasts accessibles, focus management sur modals/overlay.
-
-#### Tests ajoutés
-
-- Unitaires: agrégations (ventes/achats/exclusion cautions), logique attachments, utilitaires d'undo.
-- Intégration: endpoint `/api/dashboard/todo`, action `markRentPaid`, isolation multi‑tenant (accès refusé si propriété différente).
-- E2E (facultatif): smoke tests navigation / actions clés.
-
-#### Checklist de validation
-- [x] `pnpm lint` OK
-- [x] `pnpm typecheck` OK
-- [x] `pnpm test` OK (unit + intégration)
-- [x] `pnpm build` OK
-- [x] README mis à jour (Dashboard > À faire)
-
-#### Comment tester manuellement
-1. Créer une vente `isPaid=false` → apparaît dans “Loyers non encaissés”.
-2. Cliquer “Marquer encaissé” → disparition et toast “Annulé” possible via bouton undo.
-3. Créer une dépense sans attachment → apparaît dans “Dépenses sans justificatif”.
-4. Cliquer "Ajouter justificatif" redirige vers le journal Achats avec un filtre lisible permettant de retrouver l'entrée.
-5. Créer une vente `isDeposit=true` → incluse dans “Cautions en cours”.
-6. Vérifier scope: sélectionner scope=property depuis l'UI et constater l'agrégation par bien (si `propertyId` renseigné sur écritures/immobilisations).
+- Affiche les 5 dernières ventes (hors cautions) et les 5 dernières dépenses, triées par date décroissante.
+- UI: carte "Historique rapide" en 2 colonnes (Loyers / Dépenses), chaque ligne montre date, tiers (locataire/fournisseur) et montant, avec lien vers la liste filtrée du journal correspondant.
+- Loader: skeleton/Spinner au chargement. Affiche "Aucune donnée" si vide.
+- Endpoint: `GET /api/dashboard/history?property=<uuid>&scope=user|property`
+  - Réponse:
+    - `{ sales: [{ id, date, amount, tenant }], purchases: [{ id, date, amount, supplier }] }`
+  - Règles:
+    - sales: dernières écritures de type `vente` avec `isDeposit=false`, `orderBy date desc`, `take 5`.
+    - purchases: dernières écritures de type `achat`, `orderBy date desc`, `take 5`.
+  - Sécurité: contrôle d'appartenance de la propriété (multi-tenant) quand `scope=property`.
+- Exemple: Loyers → ligne "12/09/2025 · 650,00 € — Loc B" avec bouton "Ouvrir" qui renvoie vers `/journal/ventes?from=YYYY-MM-DD&to=YYYY-MM-DD&q=<locataire>`.
 
 ## Synthèse
 
@@ -230,6 +241,10 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - Endpoint `/api/dashboard/todo` (3 catégories)
   - Action serveur `markRentPaid`
   - UI carte “À faire” (max 5 par liste) + liens vers éditions
+  - Tests unitaires + intégration
+- [2025-09-11] Dashboard : historique rapide
+  - API `/api/dashboard/history` (5 ventes hors cautions + 5 achats, tri desc)
+  - UI carte "Historique rapide" (2 colonnes) avec liens vers les journaux
   - Tests unitaires + intégration
 + [2025-09-11] Corrections et améliorations UX
 +  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)

@@ -7,6 +7,7 @@ import { getDepositsSummary } from "@/lib/deposits";
 import { prisma } from "@/lib/prisma";
 import DashboardMonthlyClient from "./monthly-client";
 import DashboardTodoClient from "./todo-client";
+import DashboardHistoryClient from "./history-client";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,11 @@ export default async function DashboardPage() {
       {/* À faire */}
       <section>
         <DashboardTodoClient />
+      </section>
+
+      {/* Historique rapide */}
+      <section>
+        <DashboardHistoryClient />
       </section>
 
       {/* Banner profil incomplet (SSO uniquement) */}

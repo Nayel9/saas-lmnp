@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth/core";
 import { isAllowed } from "@/lib/accounting/accountsCatalog";
@@ -22,6 +23,10 @@ const entrySchema = z.object({
   currency: z.string().default("EUR"),
   isDeposit: z.preprocess(toBool, z.boolean().default(false)).optional(),
   propertyId: z.string().uuid(),
+  amountHT: z.string().optional(),
+  vatRate: z.string().optional(),
+  vatAmount: z.string().optional(),
+  amountTTC: z.string().optional(),
 });
 
 export type EntryFormData = z.infer<typeof entrySchema>;
@@ -41,30 +46,79 @@ export async function createEntry(formData: FormData) {
       error: parsed.error.flatten().formErrors.join(", "),
     } as const;
   const userId = await getUserId();
-  const { date, designation, tier, account_code, amount, currency, isDeposit, propertyId } =
+  const { date, designation, tier, account_code, amount, currency, isDeposit, propertyId, amountHT, vatRate, amountTTC } =
     parsed.data;
   if (isAllowed(account_code, "achat") && !isAllowed(account_code, "vente")) {
     return { ok: false, error: "Compte réservé aux achats" } as const;
   }
   // Vérifier appartenance du bien
-  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  const prop = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true, user_id: true } });
   if (!prop || prop.user_id !== userId) {
     return { ok: false, error: "Bien invalide" } as const;
   }
-  const created = await prisma.journalEntry.create({
-    data: {
-      user_id: userId,
-      type: "vente",
-      date: new Date(date),
-      designation,
-      tier: tier || null,
-      account_code,
+
+  // Prépare l'objet data complet (UncheckedCreateInput)
+  let data: Prisma.JournalEntryUncheckedCreateInput = {
+    user_id: userId,
+    type: "vente",
+    date: new Date(date),
+    designation,
+    account_code,
+    amount: 0, // sera mis à jour selon TVA
+    tier: tier || null,
+    currency,
+    isDeposit: !!isDeposit,
+    propertyId,
+  };
+
+  const vatRow = await prisma.$queryRawUnsafe<Array<{ vatEnabled: boolean }>>(
+    `SELECT "vatEnabled" FROM "Property" WHERE "id" = $1 AND "user_id" = $2`,
+    propertyId,
+    userId,
+  );
+  const vatOn = !!vatRow[0]?.vatEnabled;
+  if (vatOn) {
+    const rateNum = vatRate != null && vatRate !== "" ? parseFloat(String(vatRate)) : NaN;
+    const htNum = amountHT != null && amountHT !== "" ? parseFloat(String(amountHT)) : NaN;
+    const ttcNum = amountTTC != null && amountTTC !== "" ? parseFloat(String(amountTTC)) : NaN;
+    if (isNaN(rateNum) || rateNum < 0 || rateNum > 100) {
+      return { ok: false, error: "Taux TVA invalide" } as const;
+    }
+    if (isNaN(htNum) && isNaN(ttcNum)) {
+      return { ok: false, error: "Champs TVA incomplets" } as const;
+    }
+    const r = isNaN(htNum)
+      ? {
+          ht: Math.round((ttcNum / (1 + rateNum / 100)) * 100) / 100,
+          rate: rateNum,
+          tva: Math.round((ttcNum - ttcNum / (1 + rateNum / 100)) * 100) / 100,
+          ttc: Math.round(ttcNum * 100) / 100,
+        }
+      : {
+          ht: Math.round(htNum * 100) / 100,
+          rate: rateNum,
+          tva: Math.round((htNum * rateNum) / 100 * 100) / 100,
+          ttc: Math.round(htNum * (1 + rateNum / 100) * 100) / 100,
+        };
+    data = {
+      ...data,
+      amount: r.ttc,
+      amountHT: r.ht,
+      vatRate: r.rate,
+      vatAmount: r.tva,
+      amountTTC: r.ttc,
+    };
+  } else {
+    data = {
+      ...data,
       amount: parseFloat(amount),
-      currency,
-      isDeposit: !!isDeposit,
-      propertyId,
-    },
-  });
+      amountHT: null,
+      vatRate: null,
+      vatAmount: null,
+      amountTTC: null,
+    };
+  }
+  const created = await prisma.journalEntry.create({ data });
   revalidatePath("/journal/ventes");
   return { ok: true, id: created.id } as const;
 }
@@ -72,7 +126,7 @@ export async function createEntry(formData: FormData) {
 export async function updateEntry(formData: FormData) {
   const parsed = entrySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success || !parsed.data.id)
-    return { ok: false, error: "Validation" };
+    return { ok: false, error: "Validation" } as const;
   const userId = await getUserId();
   const {
     id,
@@ -84,41 +138,88 @@ export async function updateEntry(formData: FormData) {
     currency,
     isDeposit,
     propertyId,
+    amountHT,
+    vatRate,
+    amountTTC,
   } = parsed.data;
   const existing = await prisma.journalEntry.findUnique({ where: { id } });
   if (!existing || existing.user_id !== userId)
-    return { ok: false, error: "Introuvable" };
+    return { ok: false, error: "Introuvable" } as const;
   if (isAllowed(account_code, "achat") && !isAllowed(account_code, "vente")) {
-    return { ok: false, error: "Compte réservé aux achats" };
+    return { ok: false, error: "Compte réservé aux achats" } as const;
   }
-  const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+  const prop = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true, user_id: true } });
   if (!prop || prop.user_id !== userId) {
-    return { ok: false, error: "Bien invalide" };
+    return { ok: false, error: "Bien invalide" } as const;
   }
-  await prisma.journalEntry.update({
-    where: { id },
-    data: {
-      date: new Date(date),
-      designation,
-      tier: tier || null,
-      account_code,
+  let data: Prisma.JournalEntryUncheckedUpdateInput = {
+    date: new Date(date),
+    designation,
+    tier: tier || null,
+    account_code,
+    currency,
+    isDeposit: !!isDeposit,
+    propertyId,
+  };
+  const vatRow = await prisma.$queryRawUnsafe<Array<{ vatEnabled: boolean }>>(
+    `SELECT "vatEnabled" FROM "Property" WHERE "id" = $1 AND "user_id" = $2`,
+    propertyId,
+    userId,
+  );
+  const vatOn = !!vatRow[0]?.vatEnabled;
+  if (vatOn) {
+    const rateNum = vatRate != null && vatRate !== "" ? parseFloat(String(vatRate)) : NaN;
+    const htNum = amountHT != null && amountHT !== "" ? parseFloat(String(amountHT)) : NaN;
+    const ttcNum = amountTTC != null && amountTTC !== "" ? parseFloat(String(amountTTC)) : NaN;
+    if (isNaN(rateNum) || rateNum < 0 || rateNum > 100) {
+      return { ok: false, error: "Taux TVA invalide" } as const;
+    }
+    if (isNaN(htNum) && isNaN(ttcNum)) {
+      return { ok: false, error: "Champs TVA incomplets" } as const;
+    }
+    const r = isNaN(htNum)
+      ? {
+          ht: Math.round((ttcNum / (1 + rateNum / 100)) * 100) / 100,
+          rate: rateNum,
+          tva: Math.round((ttcNum - ttcNum / (1 + rateNum / 100)) * 100) / 100,
+          ttc: Math.round(ttcNum * 100) / 100,
+        }
+      : {
+          ht: Math.round(htNum * 100) / 100,
+          rate: rateNum,
+          tva: Math.round((htNum * rateNum) / 100 * 100) / 100,
+          ttc: Math.round(htNum * (1 + rateNum / 100) * 100) / 100,
+        };
+    data = {
+      ...data,
+      amount: r.ttc,
+      amountHT: r.ht,
+      vatRate: r.rate,
+      vatAmount: r.tva,
+      amountTTC: r.ttc,
+    };
+  } else {
+    data = {
+      ...data,
       amount: parseFloat(amount),
-      currency,
-      isDeposit: !!isDeposit,
-      propertyId,
-    },
-  });
+      amountHT: null,
+      vatRate: null,
+      vatAmount: null,
+      amountTTC: null,
+    };
+  }
+  await prisma.journalEntry.update({ where: { id }, data });
   revalidatePath("/journal/ventes");
-  return { ok: true };
+  return { ok: true } as const;
 }
 
 export async function deleteEntry(id: string) {
-  if (!id) return { ok: false, error: "ID manquant" };
+  if (!id) return { ok: false, error: "ID manquant" } as const;
   const userId = await getUserId();
   const existing = await prisma.journalEntry.findUnique({ where: { id } });
   if (!existing || existing.user_id !== userId)
-    return { ok: false, error: "Introuvable" };
+    return { ok: false, error: "Introuvable" } as const;
   await prisma.journalEntry.delete({ where: { id } });
   revalidatePath("/journal/ventes");
-  return { ok: true };
+  return { ok: true } as const;
 }

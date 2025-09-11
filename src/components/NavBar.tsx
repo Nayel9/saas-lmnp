@@ -130,6 +130,15 @@ export function NavBar() {
               Synthèse
             </Link>
           )}
+          {user && (
+            <Link
+              href="/settings/accounting"
+              aria-current={pathname === "/settings/accounting" ? "page" : undefined}
+              className={linkClass("/settings/accounting")}
+            >
+              Paramètres
+            </Link>
+          )}
           {user && role === "admin" && (
             <Link
               href="/admin"

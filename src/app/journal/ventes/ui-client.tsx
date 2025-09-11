@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useTransition, useCallback, useRef } from "react";
+import React, { useState, useTransition, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { formatDateISO } from "@/lib/format";
@@ -8,6 +8,7 @@ import { createEntry, updateEntry } from "./actions";
 import { AccountCodeSelector } from "@/components/AccountCodeSelector";
 import { toast } from "sonner";
 import { Spinner } from "@/components/SubmitButton";
+import { computeFromHT, computeFromTTC } from "@/lib/vat";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -17,7 +18,7 @@ const schema = z.object({
   account_code: z.string().min(1),
   amount: z.string().min(1),
   currency: z.string().default("EUR"),
-  isDeposit: z.any().optional(),
+  isDeposit: z.string().optional(),
   propertyId: z.string().uuid({ message: "Bien requis" }),
 });
 
@@ -96,9 +97,47 @@ export default function JournalVentesClient({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const [selectedProperty, setSelectedProperty] = useState<string>(
-    properties[0]?.id || "",
-  );
+  const [selectedProperty, setSelectedProperty] = useState<string>(properties[0]?.id || "");
+  const [vatOn, setVatOn] = useState<boolean>(false);
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      if (!selectedProperty) return setVatOn(false);
+      try {
+        const res = await fetch(`/api/settings/vat?property=${encodeURIComponent(selectedProperty)}`, { cache: "no-store" });
+        if (!res.ok) { setVatOn(false); return; }
+        const j = await res.json();
+        if (!abort) setVatOn(Boolean(j.vatEnabled));
+      } catch {
+        if (!abort) setVatOn(false);
+      }
+    })();
+    return () => { abort = true; };
+  }, [selectedProperty]);
+
+  const [ht, setHt] = useState<string>("");
+  const [rate, setRate] = useState<string>("20");
+  const [ttc, setTtc] = useState<string>("");
+  const [tva, setTva] = useState<string>("");
+
+  function recalcFromHT(newHt: string, newRate: string) {
+    const h = parseFloat(newHt);
+    const r = parseFloat(newRate);
+    if (isFinite(h) && isFinite(r)) {
+      const c = computeFromHT(h, r);
+      setTva(c.tva.toFixed(2));
+      setTtc(c.ttc.toFixed(2));
+    }
+  }
+  function recalcFromTTC(newTtc: string, newRate: string) {
+    const t = parseFloat(newTtc);
+    const r = parseFloat(newRate);
+    if (isFinite(t) && isFinite(r)) {
+      const c = computeFromTTC(t, r);
+      setHt(c.ht.toFixed(2));
+      setTva(c.tva.toFixed(2));
+    }
+  }
 
   const onFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -139,6 +178,10 @@ export default function JournalVentesClient({
     const fd = new FormData(e.currentTarget);
     fd.set("currency", "EUR");
     if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
+    if (vatOn) {
+      const effectiveTtc = (fd.get("amountTTC") as string) || ttc || "";
+      if (effectiveTtc) fd.set("amount", effectiveTtc);
+    }
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -172,6 +215,7 @@ export default function JournalVentesClient({
         onClick={() => {
           setError(null);
           setOpen(true);
+          setHt(""); setRate("20"); setTtc(""); setTva("");
         }}
       >
         Ajouter
@@ -211,11 +255,47 @@ export default function JournalVentesClient({
                 className="input w-full"
               />
               <AccountCodeSelector typeJournal="vente" />
-              <input
-                name="amount"
-                placeholder="Montant"
-                className="input w-full"
-              />
+              {!vatOn && (
+                <input name="amount" placeholder="Montant TTC" className="input w-full" />
+              )}
+              {vatOn && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Montant HT</div>
+                    <input
+                      name="amountHT"
+                      value={ht}
+                      onChange={(e) => { setHt(e.target.value); recalcFromHT(e.target.value, rate); }}
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Taux TVA (%)</div>
+                    <input
+                      name="vatRate"
+                      value={rate}
+                      onChange={(e) => { setRate(e.target.value); if (ht) recalcFromHT(ht, e.target.value); else if (ttc) recalcFromTTC(ttc, e.target.value); }}
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TTC</div>
+                    <input
+                      name="amountTTC"
+                      value={ttc}
+                      onChange={(e) => { setTtc(e.target.value); recalcFromTTC(e.target.value, rate); }}
+                      className="input w-full"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TVA (auto)</div>
+                    <input name="vatAmount" value={tva} readOnly className="input w-full bg-muted/50" />
+                  </label>
+                </div>
+              )}
 
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="isDeposit" value="on" />
@@ -305,6 +385,10 @@ interface EditButtonProps {
     amount: string | number;
     isDeposit?: boolean;
     propertyId?: string;
+    amountHT?: number;
+    vatRate?: number;
+    vatAmount?: number;
+    amountTTC?: number;
   };
 }
 
@@ -314,6 +398,26 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const [selectedProperty, setSelectedProperty] = useState<string>(entry.propertyId || properties[0]?.id || "");
+  const [vatOn, setVatOn] = useState<boolean>(false);
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      if (!selectedProperty) return setVatOn(false);
+      try {
+        const res = await fetch(`/api/settings/vat?property=${encodeURIComponent(selectedProperty)}`, { cache: "no-store" });
+        if (!res.ok) { setVatOn(false); return; }
+        const j = await res.json();
+        if (!abort) setVatOn(Boolean(j.vatEnabled));
+      } catch {
+        if (!abort) setVatOn(false);
+      }
+    })();
+    return () => { abort = true; };
+  }, [selectedProperty]);
+  const [htE, setHtE] = useState<string>(entry.amountHT != null ? String(entry.amountHT.toFixed ? entry.amountHT.toFixed(2) : entry.amountHT) : "");
+  const [rateE, setRateE] = useState<string>(entry.vatRate != null ? String(entry.vatRate) : "20");
+  const [ttcE, setTtcE] = useState<string>(entry.amountTTC != null ? String(entry.amountTTC.toFixed ? entry.amountTTC.toFixed(2) : entry.amountTTC) : String(entry.amount));
+  const [tvaE, setTvaE] = useState<string>(entry.vatAmount != null ? String(entry.vatAmount.toFixed ? entry.vatAmount.toFixed(2) : entry.vatAmount) : "");
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -321,6 +425,10 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
     const fd = new FormData(e.currentTarget);
     fd.set("id", entry.id);
     if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
+    if (vatOn) {
+      const effectiveTtc = (fd.get("amountTTC") as string) || ttcE || "";
+      if (effectiveTtc) fd.set("amount", effectiveTtc);
+    }
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -353,6 +461,10 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
         onClick={() => {
           setError(null);
           setOpen(true);
+          setHtE(entry.amountHT != null ? String(entry.amountHT.toFixed ? entry.amountHT.toFixed(2) : entry.amountHT) : "");
+          setRateE(entry.vatRate != null ? String(entry.vatRate) : "20");
+          setTtcE(entry.amountTTC != null ? String(entry.amountTTC.toFixed ? entry.amountTTC.toFixed(2) : entry.amountTTC) : String(entry.amount));
+          setTvaE(entry.vatAmount != null ? String(entry.vatAmount.toFixed ? entry.vatAmount.toFixed(2) : entry.vatAmount) : "");
         }}
       >
         Edit
@@ -391,15 +503,30 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
                 defaultValue={entry.tier || ""}
                 className="input w-full"
               />
-              <AccountCodeSelector
-                typeJournal="vente"
-                defaultValue={entry.account_code}
-              />
-              <input
-                name="amount"
-                defaultValue={entry.amount}
-                className="input w-full"
-              />
+              <AccountCodeSelector typeJournal="vente" defaultValue={entry.account_code} />
+              {!vatOn && (
+                <input name="amount" defaultValue={entry.amount} className="input w-full" />
+              )}
+              {vatOn && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Montant HT</div>
+                    <input name="amountHT" value={htE} onChange={(e) => { setHtE(e.target.value); const h = parseFloat(e.target.value); const r = parseFloat(rateE); if (isFinite(h) && isFinite(r)) { const c = computeFromHT(h, r); setTvaE(c.tva.toFixed(2)); setTtcE(c.ttc.toFixed(2)); } }} className="input w-full" inputMode="decimal" />
+                  </label>
+                  <label className="space-y-1">
+                    <div className="text-sm font-medium">Taux TVA (%)</div>
+                    <input name="vatRate" value={rateE} onChange={(e) => { setRateE(e.target.value); if (htE) { const h = parseFloat(htE); const r = parseFloat(e.target.value); if (isFinite(h) && isFinite(r)) { const c = computeFromHT(h, r); setTvaE(c.tva.toFixed(2)); setTtcE(c.ttc.toFixed(2)); } } else if (ttcE) { const t = parseFloat(ttcE); const r = parseFloat(e.target.value); if (isFinite(t) && isFinite(r)) { const c = computeFromTTC(t, r); setHtE(c.ht.toFixed(2)); setTvaE(c.tva.toFixed(2)); } } }} className="input w-full" inputMode="decimal" />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TTC</div>
+                    <input name="amountTTC" value={ttcE} onChange={(e) => { setTtcE(e.target.value); const t = parseFloat(e.target.value); const r = parseFloat(rateE); if (isFinite(t) && isFinite(r)) { const c = computeFromTTC(t, r); setHtE(c.ht.toFixed(2)); setTvaE(c.tva.toFixed(2)); } }} className="input w-full" inputMode="decimal" />
+                  </label>
+                  <label className="space-y-1 col-span-2">
+                    <div className="text-sm font-medium">Montant TVA (auto)</div>
+                    <input name="vatAmount" value={tvaE} readOnly className="input w-full bg-muted/50" />
+                  </label>
+                </div>
+              )}
 
               <label className="flex items-center gap-2 text-sm">
                 <input
