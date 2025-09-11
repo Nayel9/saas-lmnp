@@ -6,6 +6,7 @@ import { createProperty } from "./actions";
 import { getDepositsSummary } from "@/lib/deposits";
 import { prisma } from "@/lib/prisma";
 import DashboardMonthlyClient from "./monthly-client";
+import DashboardTodoClient from "./todo-client";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,11 @@ export default async function DashboardPage() {
       <section className="card p-4 space-y-4">
         <h2 className="text-lg font-medium">Cartes clés (mois)</h2>
         <DashboardMonthlyClient properties={properties} />
+      </section>
+
+      {/* À faire */}
+      <section>
+        <DashboardTodoClient />
       </section>
 
       {/* Banner profil incomplet (SSO uniquement) */}

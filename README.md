@@ -48,6 +48,58 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 - Variables requises: S3_BUCKET et S3_REGION ou S3_ENDPOINT; credentials recommandés
 - Mode mock local: storageKey préfixé `mock/` lit depuis `.uploads/`
 
+## Dashboard
+
+### Cartes clés (mois)
+
+- Sélecteurs: Portée (Utilisateur|Bien), Bien, Mois, Année.
+- Montre Encaissements, Dépenses, Résultat du mois + statut “Amortissement du mois”.
+- Action: “Poster l’amortissement” (idempotent) crée une ligne d’amortisation mensuelle (note `month:YYYY-MM`).
+
+### À faire (nouveau)
+
+- Carte “À faire” affichant 3 catégories (max 5 items par liste):
+  1. Loyers non encaissés: ventes `isDeposit=false` du mois dont le compte n’est pas de trésorerie (≠ 512/53). Bouton “Marquer encaissé” (action serveur) met le compte à `512` (idempotent).
+  2. Dépenses sans justificatif: achats du mois sans pièce jointe. Bouton “Ajouter justificatif” redirige vers le journal Achats avec filtre.
+  3. Cautions en cours: total + nombre de cautions (`isDeposit=true`) sur la période.
+- Endpoint: `GET /api/dashboard/todo?property=<uuid>&year=YYYY&month=MM[&scope=user|property]`
+  - Réponse `{ unpaidRents: [{ id, date, amount, tenant }], expensesWithoutDocs: [{ id, date, amount, supplier }], depositsHeld: { count, total } }`
+  - Sécurité: vérifie l’appartenance du bien au user (multi-tenant).
+- Action serveur: `markRentPaid(entryId)`
+  - Règles: uniquement ventes non dépôt du user; met `account_code="512"`; sans effet si déjà 512/53.
+- États UI: affiche “Rien à signaler 🎉” si aucune tâche.
+
+#### Améliorations récentes et bonnes pratiques
+
+- Portée (`scope`): ajout du paramètre `scope=user|property` pour filtrer les agrégations par utilisateur ou par bien (défaut `user`).
+- Détection "non encaissé": introduction d’un statut dédié côté modèle/écriture et fallback heuristique (compte non‑trésorerie) pour réduire les faux positifs.
+- Undo: actions rapides (ex: marquer encaissé) affichent un toast avec bouton “Annuler” permettant d'inverser l'opération si cliqué rapidement.
+- Attachments / UX:
+  - Aperçu pièces jointes: overlay redimensionné, message clair si aucune pièce, spinner limité pour empêcher affichage surdimensionné.
+  - Correction du filtrage lors de la navigation vers le journal depuis un item (utilisation d’une référence lisible plutôt que l'ID brute dans l’URL de filtre).
+- Accessibilité: boutons et toasts accessibles, focus management sur modals/overlay.
+
+#### Tests ajoutés
+
+- Unitaires: agrégations (ventes/achats/exclusion cautions), logique attachments, utilitaires d'undo.
+- Intégration: endpoint `/api/dashboard/todo`, action `markRentPaid`, isolation multi‑tenant (accès refusé si propriété différente).
+- E2E (facultatif): smoke tests navigation / actions clés.
+
+#### Checklist de validation
+- [x] `pnpm lint` OK
+- [x] `pnpm typecheck` OK
+- [x] `pnpm test` OK (unit + intégration)
+- [x] `pnpm build` OK
+- [x] README mis à jour (Dashboard > À faire)
+
+#### Comment tester manuellement
+1. Créer une vente `isPaid=false` → apparaît dans “Loyers non encaissés”.
+2. Cliquer “Marquer encaissé” → disparition et toast “Annulé” possible via bouton undo.
+3. Créer une dépense sans attachment → apparaît dans “Dépenses sans justificatif”.
+4. Cliquer "Ajouter justificatif" redirige vers le journal Achats avec un filtre lisible permettant de retrouver l'entrée.
+5. Créer une vente `isDeposit=true` → incluse dans “Cautions en cours”.
+6. Vérifier scope: sélectionner scope=property depuis l'UI et constater l'agrégation par bien (si `propertyId` renseigné sur écritures/immobilisations).
+
 ## Synthèse
 
 ### Portée (Utilisateur | Bien)
@@ -144,6 +196,7 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
 
 ## Screens
 
+- Dashboard → `/dashboard` : Cartes clés (mois) et section “À faire”.
 - Synthèse → `/synthesis` : onglets “Résultat (simple)” et “Bilan (simple)”.
   - Bilan: 2 cartes Actif/Passif avec totaux + indicateur d’équilibre.
 
@@ -173,3 +226,13 @@ Implémenté via `src/lib/storage/s3.ts` (AWS SDK v3).
   - UI: sélecteur sur Dashboard et Synthèse (Résultat/Bilan)
   - API: prise en charge du paramètre `scope=user|property` (+ exports CSV/PDF)
   - Schéma Prisma: `propertyId` sur `journal_entries` et `assets` (optionnel)
+- [2025-09-11] Dashboard : section “À faire”
+  - Endpoint `/api/dashboard/todo` (3 catégories)
+  - Action serveur `markRentPaid`
+  - UI carte “À faire” (max 5 par liste) + liens vers éditions
+  - Tests unitaires + intégration
++ [2025-09-11] Corrections et améliorations UX
++  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)
++  - Amélioration: Aperçu pièces jointes (overlay) — taille et message en cas d'absence de pièce
++  - Ajout d'une action d'annulation (undo) pour les marquages rapides (toast avec bouton Annuler)
++  - Mise à jour README pour la bannière LMNP et la section "À faire"
