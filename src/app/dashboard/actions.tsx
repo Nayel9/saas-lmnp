@@ -49,3 +49,43 @@ export async function postMonthlyAmortization(input: PostMonthlyAmortInput) {
   });
   return { created: true, id: created.id };
 }
+
+export async function markRentPaid(entryId: string) {
+  const session = await auth();
+  const user = session?.user;
+  if (!user) throw new Error("Non authentifié");
+  if (!entryId) throw new Error("BAD_REQUEST");
+
+  const entry = await prisma.journalEntry.findUnique({
+    where: { id: entryId },
+    select: { id: true, user_id: true, type: true, isDeposit: true, account_code: true },
+  });
+  if (!entry) throw new Error("NOT_FOUND");
+  if (entry.user_id !== user.id) throw new Error("FORBIDDEN");
+  if (entry.type !== "vente" || entry.isDeposit) throw new Error("BAD_REQUEST");
+
+  if (entry.account_code === "512" || entry.account_code === "53") return { updated: false };
+
+  await prisma.journalEntry.update({ where: { id: entryId }, data: { account_code: "512" } });
+  return { updated: true };
+}
+
+export async function unmarkRentPaid(entryId: string) {
+  const session = await auth();
+  const user = session?.user;
+  if (!user) throw new Error("Non authentifié");
+  if (!entryId) throw new Error("BAD_REQUEST");
+
+  const entry = await prisma.journalEntry.findUnique({
+    where: { id: entryId },
+    select: { id: true, user_id: true, type: true, isDeposit: true, account_code: true },
+  });
+  if (!entry) throw new Error("NOT_FOUND");
+  if (entry.user_id !== user.id) throw new Error("FORBIDDEN");
+  if (entry.type !== "vente" || entry.isDeposit) throw new Error("BAD_REQUEST");
+
+  if (entry.account_code !== "512" && entry.account_code !== "53") return { updated: false };
+
+  await prisma.journalEntry.update({ where: { id: entryId }, data: { account_code: "411" } });
+  return { updated: true };
+}
