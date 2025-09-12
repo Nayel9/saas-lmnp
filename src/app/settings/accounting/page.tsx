@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/core";
 import { prisma } from "@/lib/prisma";
 import VatToggleClient from "@/components/settings/VatToggleClient";
 import PropertyVatBadge from "@/components/settings/PropertyVatBadge";
+import AmortizationDefaultsClient from "@/components/settings/AmortizationDefaultsClient";
 
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,27 @@ export default async function AccountingSettingsPage() {
                 <div className="flex-shrink-0">
                   <VatToggleClient propertyId={p.id} initial={p.vatEnabled} />
                 </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-muted-foreground">Aucun bien</div>
+          )}
+        </div>
+      </section>
+
+      <section className="card p-4 space-y-4">
+        <div>
+          <h2 className="text-lg font-medium">Durées d’amortissement par défaut</h2>
+          <p className="text-sm text-muted-foreground">
+            Définissez des durées (en mois) par catégorie pour pré-remplir lors de la création d’une immobilisation.
+          </p>
+        </div>
+        <div className="space-y-4">
+          {properties.length > 0 ? (
+            properties.map((p) => (
+              <div key={p.id} className="rounded-md border p-3">
+                <div className="text-sm font-medium mb-2">{p.label}</div>
+                <AmortizationDefaultsClient propertyId={p.id} />
               </div>
             ))
           ) : (

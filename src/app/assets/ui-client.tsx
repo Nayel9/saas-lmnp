@@ -1,6 +1,7 @@
 "use client";
 import React, {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import { AccountCodeSelector } from "@/components/AccountCodeSelector";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/SubmitButton";
+import { ASSET_CATEGORIES, type AssetCategory } from "@/types/asset-category";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -126,6 +128,46 @@ export function AddAssetButton({
   const [selectedProperty, setSelectedProperty] = useState<string>(
     properties[0]?.id || "",
   );
+  // Ajout: catégorie et durée contrôlée
+  const [category, setCategory] = useState<AssetCategory | "">("");
+  const [durationYears, setDurationYears] = useState<string>("");
+  const [defaults, setDefaults] = useState<Record<string, number>>({}); // category -> months
+
+  useEffect(() => {
+    if (!selectedProperty) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/settings/amortization-defaults?property=${selectedProperty}`,
+        );
+        if (!res.ok) return; // silencieux
+        const data = (await res.json()) as Array<{
+          category: string;
+          defaultDurationMonths: number;
+        }>;
+        const map: Record<string, number> = {};
+        for (const r of data) map[r.category] = r.defaultDurationMonths;
+        setDefaults(map);
+        // si une catégorie est déjà sélectionnée, appliquer
+        if (category && map[category]) {
+          const months = map[category];
+          const years = Math.max(1, Math.round(months / 12));
+          setDurationYears(String(years));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [selectedProperty, category]);
+
+  useEffect(() => {
+    if (!category) return;
+    const months = defaults[String(category)];
+    if (months && Number.isFinite(months)) {
+      const years = Math.max(1, Math.round(months / 12));
+      setDurationYears(String(years));
+    }
+  }, [category, defaults]);
 
   const onFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -166,6 +208,8 @@ export function AddAssetButton({
     setError(null);
     const fd = new FormData(e.currentTarget);
     if (!fd.get("propertyId")) fd.set("propertyId", selectedProperty);
+    // S'assurer d'envoyer la durée courante (contrôlée)
+    if (durationYears) fd.set("duration_years", durationYears);
     const obj = Object.fromEntries(fd) as Record<string, FormDataEntryValue>;
     const parsed = schema.safeParse(obj);
     if (!parsed.success) {
@@ -228,10 +272,27 @@ export function AddAssetButton({
                 placeholder="Montant HT"
                 className="input w-full"
               />
+              {/* Ajout: catégorie pour pré-remplissage */}
+              <select
+                aria-label="Catégorie"
+                className="input w-full"
+                name="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as AssetCategory)}
+              >
+                <option value="">Catégorie (optionnel)</option>
+                {ASSET_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
               <input
                 name="duration_years"
                 placeholder="Durée (années)"
                 className="input w-full"
+                value={durationYears}
+                onChange={(e) => setDurationYears(e.target.value)}
               />
               <input
                 name="acquisition_date"

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { isAllowed, listFor } from "@/lib/accounting/accountsCatalog";
 
 const assetAccountCodes = listFor("asset").map((a) => a.code);
+const categories = ["mobilier", "batiment", "vehicule"] as const;
 const assetSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1),
@@ -15,12 +16,8 @@ const assetSchema = z.object({
       (v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0,
       "Montant invalide",
     ),
-  duration_years: z
-    .string()
-    .refine(
-      (v) => Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) <= 50,
-      "Durée invalide",
-    ),
+  // Rendre optionnel côté serveur pour permettre fallback par défaut
+  duration_years: z.string().optional(),
   acquisition_date: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), "Date invalide"),
@@ -31,6 +28,7 @@ const assetSchema = z.object({
       "Compte immobilisation inconnu",
     ),
   propertyId: z.string().uuid(),
+  category: z.enum(categories).optional(),
 });
 
 async function getUserId() {
@@ -55,13 +53,35 @@ export async function createAsset(formData: FormData) {
   const prop = await prisma.property.findUnique({ where: { id: propertyId } });
   if (!prop || prop.user_id !== user_id)
     return { ok: false, error: "Bien invalide" };
-  const { label, amount_ht, duration_years, acquisition_date } = parsed.data;
+  const { label, amount_ht, duration_years, acquisition_date, category } =
+    parsed.data;
+
+  // Déterminer la durée en années: si absente/vides et catégorie fournie, lire défaut
+  let durationYearsFinal: number | null = null;
+  const raw = (duration_years ?? "").trim();
+  if (raw) {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n <= 0 || n > 50)
+      return { ok: false, error: "Durée invalide" };
+    durationYearsFinal = n;
+  } else if (category) {
+    const def = await prisma.amortizationDefault.findUnique({
+      where: { propertyId_category: { propertyId, category } },
+    });
+    if (def && def.defaultDurationMonths > 0) {
+      const years = Math.round(def.defaultDurationMonths / 12);
+      durationYearsFinal = years > 0 ? years : 1;
+    }
+  }
+  if (!durationYearsFinal)
+    return { ok: false, error: "Durée invalide" };
+
   const created = await prisma.asset.create({
     data: {
       user_id,
       label,
       amount_ht: parseFloat(amount_ht),
-      duration_years: Number(duration_years),
+      duration_years: durationYearsFinal,
       acquisition_date: new Date(acquisition_date),
       account_code,
       propertyId,
@@ -87,12 +107,16 @@ export async function updateAsset(formData: FormData) {
   const prop = await prisma.property.findUnique({ where: { id: propertyId } });
   if (!prop || prop.user_id !== user_id)
     return { ok: false, error: "Bien invalide" };
+  const raw = (duration_years ?? "").trim();
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0 || n > 50)
+    return { ok: false, error: "Durée invalide" };
   await prisma.asset.update({
     where: { id },
     data: {
       label,
       amount_ht: parseFloat(amount_ht),
-      duration_years: Number(duration_years),
+      duration_years: n,
       acquisition_date: new Date(acquisition_date),
       account_code,
       propertyId,
