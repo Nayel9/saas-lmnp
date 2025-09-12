@@ -2,6 +2,23 @@
 
 Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Mantine • Auth.js (NextAuth v5, Credentials) • Prisma • pnpm
 
+## Onboarding (Wizard 3 étapes)
+
+Objectif: rendre un nouvel utilisateur opérationnel en moins de 2 minutes.
+
+Étapes:
+1. Créer un bien (Nom, Date début activité par défaut = aujourd'hui, IBAN optionnel, Adresse optionnelle). Champ `vatEnabled` forcé à false par défaut. Retourne `propertyId` et active les étapes suivantes.
+2. Ajouter une vente initiale (loyer) liée au bien: Date (par défaut aujourd'hui), Montant TTC, Locataire, Caution ? (switch). Crée une écriture `JournalEntry` type `vente` (compte 706) avec `paymentStatus=PENDING`. Les cautions (`isDeposit=true`) sont exclues des revenus (aligné agrégations existantes).
+3. Ajouter une immobilisation: Catégorie (enum `AssetCategory`), Nom, Coût TTC, Date de mise en service, Durée (mois). La durée est pré‑remplie si un `AmortizationDefault` existe pour (bien, catégorie). Création `Asset` (compte 2183 par défaut mobilier) + génération planning linéaire prorata 1er mois (non encore persisté, uniquement renvoyé).
+
+Fin: écran succès avec accès direct Dashboard, Ventes, Immobilisations.
+
+Techniques:
+- Multi-tenant: chaque action vérifie l'appartenance du `propertyId`.
+- Validation: zod sur chaque étape + routes API `/api/onboarding/{property|sale|asset}`.
+- State client typé `{ propertyId?, saleId?, assetId? }`, étapes 2/3 désactivées avant création du bien.
+- Pas de `any` / `@ts-ignore`.
+
 ## Features
 
 - Journaux Achats/Ventes avec pièces jointes et export
@@ -279,3 +296,8 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
   - API CRUD `/api/settings/amortization-defaults`
   - UI paramètres (table éditable, ajout/suppression, validation zod)
   - Formulaire Immobilisation: pré-remplissage de la durée si défaut existant (modif possible)
+- [2025-09-12] Onboarding : wizard 3 étapes
+  - Routes API `/api/onboarding/{property|sale|asset}` (zod + multi-tenant)
+  - Champs supplémentaires: `Property.startDate`, `Property.iban`, `JournalEntry.paymentStatus` (enum PaymentStatus)
+  - Génération planning amortissement en mémoire après création asset
+  - UI client (3 étapes + écran succès)

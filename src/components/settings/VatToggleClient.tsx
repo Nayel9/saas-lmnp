@@ -51,7 +51,7 @@ export default function VatToggleClient({
       } catch {
         // ignore refresh errors
       }
-    } catch (err) {
+    } catch {
       setEnabled(!target);
       postUpdate(propertyId, !target);
       toast.error("Échec de la sauvegarde");
