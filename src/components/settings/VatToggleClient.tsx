@@ -66,7 +66,6 @@ export default function VatToggleClient({
         type="button"
         onClick={() => !loading && toggle()}
         disabled={loading}
-        variant={enabled ? "secondary" : "default"}
         aria-pressed={enabled}
         title={enabled ? "Désactiver la TVA" : "Activer la TVA"}
         className={enabled ? "btn-primary" : "btn-ghost"}

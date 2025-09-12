@@ -16,11 +16,13 @@ model Property {
   createdAt  DateTime @default(now())
   vatEnabled Boolean  @default(false)
 
-  incomes       Income[]
-  expenses      Expense[]
-  amortizations Amortization[]
-  JournalEntry  JournalEntry[]
-  Asset         Asset[]
+  incomes              Income[]
+  expenses             Expense[]
+  amortizations        Amortization[]
+  JournalEntry         JournalEntry[]
+  Asset                Asset[]
+  // Ajout: relations vers les durées d'amortissement par défaut
+  amortizationDefaults AmortizationDefault[]
 
   @@map("Property")
 }
@@ -193,4 +195,25 @@ model VerificationToken {
   expires    DateTime
 
   @@index([identifier], name: "identifier_idx")
+}
+
+/// ============== Amortization defaults ==============
+
+enum AssetCategory {
+  mobilier
+  batiment
+  vehicule
+}
+
+model AmortizationDefault {
+  id                    String        @id @default(cuid())
+  propertyId            String
+  category              AssetCategory
+  defaultDurationMonths Int
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  property              Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, category])
+  @@map("amortization_defaults")
 }

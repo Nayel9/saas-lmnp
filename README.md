@@ -76,13 +76,36 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
 - Limitation MVP:
   - Les agrégations (Résultat, Bilan, Dashboard, exports) continuent d’utiliser `amount` (TTC). Pas de déclaration TVA.
 
+## Paramètres > Amortissements par défaut (nouveau)
+
+- Fonction: définir des durées d’amortissement par catégorie (mobilier, bâtiment, véhicule) exprimées en mois pour pré-remplir la durée lors de la création d’une immobilisation.
+- Portée: par bien (Property). Chaque bien peut définir ses propres valeurs par catégorie.
+- Utilisation: dans `/settings/accounting`, section “Durées d’amortissement par défaut”, ajoutez une ligne par catégorie avec la durée (en mois). Lors de la création d’une immobilisation, si vous sélectionnez une catégorie et qu’un défaut existe pour le bien choisi, la durée est pré‑remplie (convertie en années, arrondi au plus proche). L’utilisateur peut toujours modifier la durée avant enregistrement.
+- Limitations: le pré‑remplissage est indicatif et reste modifiable au cas par cas; aucune catégorie n’est imposée au modèle Asset (MVP). Unicité par (bien, catégorie).
+
+### API
+- `GET /api/settings/amortization-defaults?property=<uuid>` — liste les défauts d’un bien.
+- `POST /api/settings/amortization-defaults` — crée un défaut `{ propertyId, category, defaultDurationMonths }` (validation zod, durée > 0, contrôle d’appartenance).
+- `PATCH /api/settings/amortization-defaults/:id` — met à jour la durée.
+- `DELETE /api/settings/amortization-defaults/:id` — supprime.
+
+### Modèle Prisma
+- Enum `AssetCategory` (mobilier, batiment, vehicule)
+- Table `amortization_defaults` avec `(propertyId, category)` unique.
+
+### UI
+- Section Paramètres → “Durées d’amortissement par défaut” avec table éditable (Catégorie, Durée (mois), Actions), bouton “Ajouter une catégorie”.
+
+### Création d’Immobilisation
+- Ajout d’un sélecteur de catégorie (optionnel). Si un défaut existe pour le bien et la catégorie choisis, la durée est pré‑remplie (en années). Toujours modifiable.
+
 ## Dashboard
 
 ### Cartes clés (mois)
 
 - Sélecteurs: Portée (Utilisateur|Bien), Bien, Mois, Année.
 - Montre Encaissements, Dépenses, Résultat du mois + statut “Amortissement du mois”.
-- Action: “Poster l’amortissement” (idempotent) crée une ligne d’amortisation mensuelle (note `month:YYYY-MM`).
+- Action: “Poster l’amortissement” (idempotent) crée une ligne d’amortissement mensuelle (note `month:YYYY-MM`).
 
 ### À faire (nouveau)
 
@@ -246,8 +269,13 @@ Stack: Next 15 • React 19 • TypeScript (strict) • Tailwind v4 (CLI) • Ma
   - API `/api/dashboard/history` (5 ventes hors cautions + 5 achats, tri desc)
   - UI carte "Historique rapide" (2 colonnes) avec liens vers les journaux
   - Tests unitaires + intégration
-+ [2025-09-11] Corrections et améliorations UX
-+  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)
-+  - Amélioration: Aperçu pièces jointes (overlay) — taille et message en cas d'absence de pièce
-+  - Ajout d'une action d'annulation (undo) pour les marquages rapides (toast avec bouton Annuler)
-+  - Mise à jour README pour la bannière LMNP et la section "À faire"
+- [2025-09-11] Corrections et améliorations UX
+  - Fix: Spinner trop grand dans les overlays/modal — limité par dimensions explicites (SubmitButton Spinner)
+  - Amélioration: Aperçu pièces jointes (overlay) — taille et message en cas d'absence de pièce
+  - Ajout d'une action d'annulation (undo) pour les marquages rapides (toast avec bouton Annuler)
+  - Mise à jour README pour la bannière LMNP et la section "À faire"
+- [2025-09-11] Paramètres : durées d’amortissement par défaut
+  - Enum `AssetCategory` et table `amortization_defaults` (contrainte unique `propertyId+category`)
+  - API CRUD `/api/settings/amortization-defaults`
+  - UI paramètres (table éditable, ajout/suppression, validation zod)
+  - Formulaire Immobilisation: pré-remplissage de la durée si défaut existant (modif possible)
