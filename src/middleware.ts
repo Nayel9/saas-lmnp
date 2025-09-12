@@ -8,13 +8,13 @@ export async function middleware(request: NextRequest) {
   const { nextUrl } = request;
   const path = nextUrl.pathname;
 
-  // 0) Redirection www -> apex (SEO-friendly, garde le chemin & la query)
-  const host = request.headers.get("host") ?? "";
-  if (host.startsWith("www.")) {
-    const url = new URL(request.url);
-    url.hostname = host.slice(4); // enlève "www."
-    return NextResponse.redirect(url, 308);
-  }
+  // // 0) Redirection www -> apex (SEO-friendly, garde le chemin & la query)
+  // const host = request.headers.get("host") ?? "";
+  // if (host.startsWith("www.")) {
+  //   const url = new URL(request.url);
+  //   url.hostname = host.slice(4); // enlève "www."
+  //   return NextResponse.redirect(url, 308);
+  // }
 
   // 1) Exclusions (assets / api / favicon / onboarding lui-même)
   const isExcluded =
