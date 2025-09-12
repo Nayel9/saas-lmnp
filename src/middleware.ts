@@ -5,9 +5,18 @@ import { auth } from "@/lib/auth/core";
 import { getUserRole } from "@/lib/auth";
 
 export async function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
+  const { nextUrl } = request;
+  const path = nextUrl.pathname;
 
-  // Exclusions (assets/api/onboarding lui-même)
+  // 0) Redirection www -> apex (SEO-friendly, garde le chemin & la query)
+  const host = request.headers.get("host") ?? "";
+  if (host.startsWith("www.")) {
+    const url = new URL(request.url);
+    url.hostname = host.slice(4); // enlève "www."
+    return NextResponse.redirect(url, 308);
+  }
+
+  // 1) Exclusions (assets / api / favicon / onboarding lui-même)
   const isExcluded =
     path.startsWith("/_next") ||
     path.startsWith("/api") ||
@@ -17,18 +26,18 @@ export async function middleware(request: NextRequest) {
 
   if (isExcluded) return NextResponse.next();
 
+  // 2) Session utilisateur
   const session = await auth();
   const user = session?.user as
     | { role?: string; needsProfile?: boolean; isSso?: boolean }
     | undefined;
 
-  // 1) Redirection onboarding seulement pour SSO si profil incomplet
+  // 3) Onboarding pour comptes SSO au profil incomplet
   if (user?.isSso && user?.needsProfile) {
-    const url = new URL("/onboarding/profile", request.url);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/onboarding/profile", request.url));
   }
 
-  // 2) Tes règles d’accès existantes
+  // 4) Règles d’accès
   if (
     path.startsWith("/dashboard") ||
     path.startsWith("/admin") ||
@@ -48,7 +57,10 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Matcher “global” conseillé : applique le middleware partout sauf assets/api
+// Matcher : applique partout sauf assets/api/fichiers statiques courants
 export const config = {
-  matcher: ["/((?!_next|api|static|favicon.ico).*)"],
+  matcher: [
+    // Utiliser des groupes non-capturants pour la liste d'extensions afin d'éviter des groupes capturants
+    "/((?!_next|api|static|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|txt|xml|map)).*)",
+  ],
 };
