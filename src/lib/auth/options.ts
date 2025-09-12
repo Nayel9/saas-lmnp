@@ -135,6 +135,16 @@ export const authOptions: NextAuthConfig = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name ?? `${profile.given_name ?? ""} ${profile.family_name ?? ""}`.trim(),
+          email: profile.email,
+          image: profile.picture,
+          // Google renvoie `email_verified: boolean`
+          emailVerified: profile.email_verified ? new Date() : null,
+        };
+      },
     }),
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
@@ -149,7 +159,7 @@ export const authOptions: NextAuthConfig = {
         (account?.provider === "google" || account?.provider === "linkedin") &&
         user.email
       ) {
-        await prisma.user.update({
+        await prisma.user.updateMany({
           where: { email: user.email },
           data: { emailVerified: new Date() },
         });
