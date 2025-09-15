@@ -23,6 +23,7 @@ vi.mock("@/lib/prisma", () => {
   interface DeleteManyArgs { where: { userId: string } }
   interface CreateTokenArgs { data: { userId: string; token: string; expiresAt: Date } }
   interface FindManyTokenArgs { where: { expiresAt: { gt: Date } } }
+  interface FindUniqueTokenArgs { where: { id: string } }
 
   const user = {
     findUnique: ({ where }: FindUniqueArgs): Promise<MockUser | null> => {
@@ -51,6 +52,9 @@ vi.mock("@/lib/prisma", () => {
     },
     findMany: ({ where }: FindManyTokenArgs): Promise<MockPasswordResetToken[]> => {
       return Promise.resolve(prTokens.filter(t => t.expiresAt > where.expiresAt.gt));
+    },
+    findUnique: ({ where }: FindUniqueTokenArgs): Promise<MockPasswordResetToken | null> => {
+      return Promise.resolve(prTokens.find(t => t.id === where.id) || null);
     },
   };
   return { prisma: { user, passwordResetToken, __stores: { users, prTokens } } };
@@ -159,5 +163,19 @@ describe("Password reset flow", () => {
     stores.prTokens.push({ id: "prtE", userId: "u12", token: "hashed:tokexp", createdAt: new Date(), expiresAt: new Date(Date.now() - 1000) });
     const r = await resetPOST(makeRequest("http://localhost/api/auth/reset-password", { token: "tokexp", password: "abcdefgh" }));
     expect(r.status).toBe(400);
+  });
+
+  it("/reset-password accepte le format composite id.token", async () => {
+    const stores = (prisma as unknown as MockStores).__stores;
+    stores.users.push({ id: "u13", email: "comp@test.local", password: "hashed:old" });
+    await forgotPOST(makeRequest("http://localhost/api/auth/forgot-password", { email: "comp@test.local" }));
+    const plain = getPlainPasswordResetToken("u13")!; // plain token stocké coté dev/test
+    // Récupérer l'id du token créé
+    const created = stores.prTokens.find(t => t.userId === "u13")!;
+    const composite = `${created.id}.${plain}`;
+    const r = await resetPOST(makeRequest("http://localhost/api/auth/reset-password", { token: composite, password: "abcdefgh" }));
+    expect(r.status).toBe(200);
+    const user = stores.users.find(u => u.id === "u13");
+    expect(user?.password).toBe("hashed:abcdefgh");
   });
 });

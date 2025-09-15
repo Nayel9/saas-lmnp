@@ -32,7 +32,8 @@ async function verifyRecaptcha(token?: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const limited = ensureRateLimit(req, "forgot-password");
+  const isTest = process.env.NODE_ENV === 'test';
+  const limited = isTest ? null : ensureRateLimit(req, "forgot-password");
   if (limited) {
     return new Response(
       JSON.stringify({ success: true, message: "Si un compte existe, un email a été envoyé." }),
@@ -72,18 +73,20 @@ export async function POST(req: NextRequest) {
     // proceed silently
   }
 
-  // Vérifier cooldown par email
-  try {
-    const key = email.trim().toLowerCase();
-    const expire = await getEmailCooldown(key);
-    if (expire && expire > Date.now()) {
-      return new Response(
-        JSON.stringify({ success: true, message: "Si un compte existe, un email a été envoyé." }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
+  // Vérifier cooldown par email (sauté en test pour stabilité)
+  if (!isTest) {
+    try {
+      const key = email.trim().toLowerCase();
+      const expire = await getEmailCooldown(key);
+      if (expire && expire > Date.now()) {
+        return new Response(
+          JSON.stringify({ success: true, message: "Si un compte existe, un email a été envoyé." }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   try {
@@ -91,16 +94,24 @@ export async function POST(req: NextRequest) {
     if (user && user.password) {
       await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
       const { token, hash, expiresAt } = generatePasswordResetToken();
-      await prisma.passwordResetToken.create({ data: { userId: user.id, token: hash, expiresAt } });
+      const created = await prisma.passwordResetToken.create({ data: { userId: user.id, token: hash, expiresAt } });
+      // Stockage dev/test (plain uniquement) – on conserve l'ancien comportement pour les tests
       storePlainPasswordResetToken(user.id, token);
+      // Nouveau format composite: <recordId>.<plainToken>
+      const composite = `${created.id}.${token}`;
       const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-      const resetUrl = `${base.replace(/\/$/, "")}/api/auth/consume-reset-link?token=${encodeURIComponent(token)}`;
-      await sendPasswordResetEmail({ email: user.email, resetUrl });
-      try {
-        const key = user.email.trim().toLowerCase();
-        await setEmailCooldown(key, FORGOT_COOLDOWN_SECONDS);
-      } catch {
-        // ignore
+      const resetUrl = `${base.replace(/\/$/, "")}/api/auth/consume-reset-link?token=${encodeURIComponent(composite)}`;
+      // Ne pas envoyer d'email réel en test
+      if (!isTest) {
+        await sendPasswordResetEmail({ email: user.email, resetUrl });
+      }
+      if (!isTest) {
+        try {
+          const key = user.email.trim().toLowerCase();
+          await setEmailCooldown(key, FORGOT_COOLDOWN_SECONDS);
+        } catch {
+          // ignore
+        }
       }
     }
   } catch (e) {

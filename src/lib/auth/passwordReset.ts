@@ -46,10 +46,25 @@ export function generatePasswordResetToken(): GeneratedPasswordResetToken {
 // Recherche un token valide (non expiré) correspondant au plainToken fourni
 export async function findValidPasswordResetToken(plainToken: string) {
   const now = new Date();
+  // Nouveau format: id.plainToken pour lookup direct
+  if (plainToken.includes('.')) {
+    const [recordId, rawToken] = plainToken.split('.', 2);
+    if (recordId && rawToken) {
+      try {
+        const rec = await prisma.passwordResetToken.findUnique({ where: { id: recordId } });
+        if (rec && rec.expiresAt > now) {
+          const ok = await bcrypt.compare(rawToken, rec.token);
+            if (ok) return rec;
+        }
+      } catch { /* ignore */ }
+      // Si format composite mais non valide, on échoue directement (pas de fallback scan)
+      return null;
+    }
+  }
+  // Ancien format: on scanne tous les tokens valides (suppression de la limite take:200)
   const candidates = await prisma.passwordResetToken.findMany({
     where: { expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
-    take: 200, // limite de sécurité
   });
   for (const t of candidates) {
     const ok = await bcrypt.compare(plainToken, t.token);

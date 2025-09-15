@@ -26,7 +26,7 @@ export interface AppUser {
   phone?: string | null;
 }
 
-type SessionUser = DefaultSession["user"] & {
+export type SessionUser = DefaultSession["user"] & {
   id: string;
   email: string; // Rendre l'email obligatoire et non nullable
   role?: string;
