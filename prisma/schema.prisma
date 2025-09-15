@@ -147,22 +147,23 @@ model Attachment {
 
 /// ================= NextAuth Models =================
 model User {
-  id              String    @id @default(uuid())
-  name            String?
-  firstName       String? // nouvel attribut
-  lastName        String? // nouvel attribut
-  email           String    @unique
-  emailVerified   DateTime?
-  image           String?
-  password        String? // hash bcrypt
-  role            String    @default("user")
-  plan            String? // optionnel (ex: free, pro)
-  phone           String? // téléphone
-  accounts        Account[]
-  sessions        Session[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  termsAcceptedAt DateTime? // timestamp acceptation CGV
+  id                  String               @id @default(uuid())
+  name                String?
+  firstName           String? // nouvel attribut
+  lastName            String? // nouvel attribut
+  email               String               @unique
+  emailVerified       DateTime?
+  image               String?
+  password            String? // hash bcrypt
+  role                String               @default("user")
+  plan                String? // optionnel (ex: free, pro)
+  phone               String? // téléphone
+  accounts            Account[]
+  sessions            Session[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  termsAcceptedAt     DateTime? // timestamp acceptation CGV
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Account {
@@ -228,4 +229,16 @@ enum PaymentStatus {
   PENDING
   PAID
   CANCELLED
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String // hash bcrypt du token
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, token])
+  @@map("password_reset_tokens")
 }

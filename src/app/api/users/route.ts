@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return new Response("Existe déjà", { status: 409 });
 
-    const hash = await bcrypt.hash(password, 10);
+    const saltRounds = process.env.NODE_ENV === "test" ? 4 : 10; // accélère tests
+    const hash = await bcrypt.hash(password, saltRounds);
     await prisma.user.create({
       data: {
         email,
@@ -71,8 +72,12 @@ export async function POST(req: NextRequest) {
     });
     storePlainVerificationToken(email, token);
 
-    const verifyUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
-    await sendVerificationEmail({ email, verifyUrl, firstName, lastName });
+    if (process.env.NODE_ENV !== "test") {
+      const verifyUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/verify?token=${encodeURIComponent(
+        token,
+      )}&email=${encodeURIComponent(email)}`;
+      await sendVerificationEmail({ email, verifyUrl, firstName, lastName });
+    }
 
     return new Response(
       JSON.stringify({
