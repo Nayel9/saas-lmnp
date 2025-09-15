@@ -306,3 +306,78 @@ Techniques:
   - UI pages `/forgot-password` & `/reset-password`
   - Email reset (30 min) + tokens hashés & invalidation globale après reset
   - Tests unitaires & intégration
+
+## Auth & Sécurité > Guards
+
+Cette application applique une défense en profondeur pour toutes les surfaces sensibles (pages, API, server components, server actions) avec un modèle multi-tenant (resources liées à un `propertyId`).
+
+### 1. middleware.ts
+- Protège toutes les pages ayant un préfixe dans: `/dashboard`, `/sales`, `/purchases`, `/assets`, `/synthesis`, `/settings`.
+- Protège toutes les routes `/api/**` sauf `/api/auth/**` et `/api/public/**`.
+- Si non authentifié sur une page protégée: redirection 302 vers `/login?next=<chemin>`.
+- Si non authentifié sur une API protégée: réponse JSON `{ error: "Unauthorized" }` (401).
+- Si déjà authentifié et navigation vers `/login`: redirection 302 vers `/dashboard`.
+
+### 2. Helpers serveur (src/lib/auth/guards.ts)
+- `requireSession()` → retourne `{ user }` (type strict `SessionUser`) ou jette `UnauthorizedError` (401).
+- `requirePropertyAccess(propertyId)` → vérifie existence + ownership du bien; jette `ForbiddenError` sinon (403).
+- Sans `any` ; validation `propertyId` via zod UUID.
+
+### 3. Wrappers API
+- `withAuth(handler)` → applique `requireSession` et renvoie 401 en absence de session.
+- `withPropertyScope(handler)` → exige un `?property=` ou `?propertyId=`, vérifie ownership, renvoie 400 si manquant, 403 si étranger.
+- Utilisés sur les endpoints sensibles (`/api/dashboard/monthly`, `/api/synthesis/income-statement`, etc.) pour factoriser la logique.
+
+### 4. Pages d’erreur
+- `/401` et `/403` : pages minimalistes (FR) avec liens retour.
+
+### 5. Redirection post-login
+- Paramètre `next` nettoyé côté client (interdit valeurs externes ou pages publiques) avant redirection.
+
+### 6. Matrice d’accès
+| Espace | Public | Auth requis | Ownership (property) |
+| ------ | ------ | ----------- | --------------------- |
+| /login, /signup, /forgot-password, /reset-password | ✅ | ❌ | n/a |
+| /public/** | ✅ | ❌ | n/a |
+| /api/auth/** | ✅ | ❌ | n/a |
+| /dashboard, /sales, /purchases, /assets, /synthesis, /settings | ❌ | ✅ | (selon data chargée) |
+| /api/** (hors exclusions) | ❌ | ✅ | Endpoints *property-scoped* |
+
+### 7. Erreurs typées
+- `UnauthorizedError` (401) & `ForbiddenError` (403) converties en `Response` pour API / server actions.
+
+### 8. Server Actions & Server Components
+- Toute action modifiant des données doit appeler `requireSession()` puis, pour les ressources liées, `requirePropertyAccess()`.
+
+### 9. Optionnel : Redis session store
+**Non activé par défaut.** Scénarios où l’activer :
+- Déploiement multi‑instances nécessitant invalidation centralisée des sessions (ex: logout global, revocation manuelle).
+- Besoin de marquer certaines sessions invalidées avant expiration (liste de révocation).
+
+Si activé (ex: Upstash Redis) :
+1. Stocker un enregistrement `{ sessionToken -> userId }` avec TTL = expiration JWT/Session.
+2. Au niveau du `middleware` et des wrappers API, après `auth()`, vérifier la présence du token dans Redis (sinon 401).
+3. Lors d’un logout ou d’une revocation administrative, supprimer la clé.
+
+Variables d’environnement suggérées:
+```
+REDIS_URL=...
+REDIS_TOKEN=... (si provider managé type Upstash)
+SESSION_REDIS_PREFIX=app:sess:
+```
+Pseudocode vérification supplémentaire :
+```ts
+const token = cookies().get("next-auth.session-token")?.value;
+if (token) {
+  const ok = await redis.exists(`${prefix}${token}`);
+  if (!ok) throw new UnauthorizedError();
+}
+```
+> Laisser désactivé tant qu’un seul nœud sert l’application : pas de coût supplémentaire inutile.
+
+### 10. Tests
+- Unitaires: guards (`requireSession`, `requirePropertyAccess`, wrappers) → 401/403 attendus.
+- Intégration: endpoints protégés (401 non connecté, 403 propriété étrangère, 200 owner).
+- Middleware: redirection login + 401 API vérifiés.
+
+

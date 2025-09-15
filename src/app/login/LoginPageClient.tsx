@@ -50,6 +50,16 @@ export default function LoginPageClient() {
   const { status } = useSession();
   const search = useSearchParams();
   const verifiedParam = search?.get("verified");
+  const nextParam = search?.get("next") || "/dashboard";
+  function sanitizeNext(p: string): string {
+    if (!p.startsWith("/")) return "/dashboard"; // doit être relatif interne
+    if (p.startsWith("//")) return "/dashboard"; // éviter protocol-relative
+    // Interdire navigation vers pages publiques auth pour éviter boucle
+    if (["/login", "/signup", "/forgot-password", "/reset-password"].includes(p)) {
+      return "/dashboard";
+    }
+    return p;
+  }
 
   const [mode, setMode] = useState<Mode>("login");
   const [formData, setFormData] = useState({
@@ -71,8 +81,8 @@ export default function LoginPageClient() {
 
   useEffect(() => {
     if (status === "authenticated" && !showVerifyModal)
-      router.replace("/dashboard");
-  }, [status, router, showVerifyModal]);
+      router.replace(sanitizeNext(nextParam));
+  }, [status, router, showVerifyModal, nextParam]);
 
   useEffect(() => {
     if (search?.get("forceVerify") === "1") {
@@ -168,7 +178,7 @@ export default function LoginPageClient() {
             }
             return;
           }
-          router.push("/dashboard");
+          router.push(sanitizeNext(nextParam));
         }
       } catch {
         setErrors({ global: "Erreur serveur" });
@@ -176,7 +186,7 @@ export default function LoginPageClient() {
         setIsBusy(false);
       }
     },
-    [formData, honeyValue, mode, router, acceptTerms],
+    [formData, honeyValue, mode, router, acceptTerms, nextParam],
   );
 
   const resend = async () => {
