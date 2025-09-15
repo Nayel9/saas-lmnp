@@ -30,9 +30,9 @@ export function PasswordStrengthMeter({ password, className }: Props) {
 
   return (
     <div className="mt-1">
-      <div className={`h-2 w-full bg-gray-200 rounded ${className}`}>
+      <div className={`h-2 w-full bg-gray-200 rounded-md ${className}`}>
         <div
-          className={`h-2 rounded transition-all duration-300 ${getColor()}`}
+          className={`h-2 rounded-md transition-all duration-300 ${getColor()}`}
           style={{ width: `${percent}%` }}
         ></div>
       </div>

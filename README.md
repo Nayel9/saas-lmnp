@@ -301,3 +301,8 @@ Techniques:
   - Champs supplémentaires: `Property.startDate`, `Property.iban`, `JournalEntry.paymentStatus` (enum PaymentStatus)
   - Génération planning amortissement en mémoire après création asset
   - UI client (3 étapes + écran succès)
+- [2025-09-15] Auth : mot de passe oublié
+  - Modèle `PasswordResetToken` + routes `/api/auth/forgot-password` & `/api/auth/reset-password`
+  - UI pages `/forgot-password` & `/reset-password`
+  - Email reset (30 min) + tokens hashés & invalidation globale après reset
+  - Tests unitaires & intégration

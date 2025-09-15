@@ -360,6 +360,16 @@ export default function LoginPageClient() {
                   mode === "login" ? "current-password" : "new-password"
                 }
               />
+              {mode === "login" && (
+                <div className="flex justify-end -mt-2 mb-1">
+                  <a
+                    href="/forgot-password"
+                    className="text-xs underline text-muted-foreground hover:text-foreground"
+                  >
+                    Mot de passe oublié ?
+                  </a>
+                </div>
+              )}
               {showStrength && (
                 <PasswordStrengthMeter
                   password={formData.password}
