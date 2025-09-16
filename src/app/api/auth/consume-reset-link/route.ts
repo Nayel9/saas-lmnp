@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = "nodejs";
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get('token');
@@ -25,4 +27,3 @@ export async function GET(req: Request) {
   res.headers.set('Set-Cookie', cookieHeader);
   return res;
 }
-
