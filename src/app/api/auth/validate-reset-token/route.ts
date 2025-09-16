@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { JwtPayload } from 'jsonwebtoken';
 
+export const runtime = "nodejs";
+
 interface TokenPayload { email?: string; user?: { email?: string }; }
 
 export async function GET(req: Request) {

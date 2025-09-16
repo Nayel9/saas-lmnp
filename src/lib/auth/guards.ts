@@ -1,5 +1,5 @@
 // src/lib/auth/guards.ts
-"use server";
+// "use server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/core";
 import { prisma } from "@/lib/prisma";
@@ -26,7 +26,16 @@ async function verifyPropertyOwnership(userId: string, rawId: string): Promise<s
   const parsed = UUID.safeParse(rawId);
   if (!parsed.success) throw new ForbiddenError("propertyId invalide");
   const property = await prisma.property.findUnique({ where: { id: parsed.data } });
-  if (!property || property.user_id !== userId) {
+  if (!property) {
+    throw new ForbiddenError("Propriété introuvable");
+  }
+  // Accès sûr aux clés potentiellement présentes dans l'objet retourné par Prisma
+  const p = property as unknown as Record<string, unknown>;
+  const ownerId: string | undefined =
+    typeof p["userId"] === "string" ? (p["userId"] as string) :
+    typeof p["user_id"] === "string" ? (p["user_id"] as string) :
+    undefined;
+  if (ownerId !== userId) {
     throw new ForbiddenError("Propriété non autorisée");
   }
   return parsed.data;
