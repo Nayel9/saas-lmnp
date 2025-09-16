@@ -8,7 +8,7 @@ export default function Page403() {
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold">403 – Accès interdit</h1>
         <p className="text-muted-foreground max-w-md mx-auto">
-          Vous n'avez pas les droits nécessaires pour cette ressource.
+          Vous n&apos;avez pas les droits nécessaires pour cette ressource.
         </p>
       </div>
       <div className="flex gap-3">
