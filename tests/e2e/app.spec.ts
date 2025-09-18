@@ -111,6 +111,50 @@ function parseMoney(txt: string): number {
 
 let achatEditedGlobal: string | undefined;
 
+// Helper: create a property for a user directly in DB
+async function ensurePropertyForUser(email: string, label: string) {
+  const owner = await prisma.user.findUnique({ where: { email } });
+  if (!owner) return;
+  const count = await prisma.property.count({ where: { user_id: owner.id } });
+  if (count === 0) {
+    await prisma.property.create({ data: { user_id: owner.id, label, address: null } });
+  }
+}
+
+// Helper: create a property quickly on dashboard
+async function createProperty(page: Page, label: string) {
+  await page.goto("/dashboard");
+  await page.fill('input[name="label"]', label);
+  await page.click('button:has-text("Ajouter")');
+}
+
+// Helper: select ledger account in modal form by visible code
+async function selectLedgerByCode(
+  page: Page,
+  kind: "EXPENSE" | "REVENUE",
+  code: string,
+) {
+  const aria = kind === "EXPENSE" ? "Compte de charges" : "Compte de produits";
+  const sel = page.locator(`select[aria-label="${aria}"]`);
+  await sel.waitFor();
+  const value = await page.evaluate(({ aria, code }) => {
+    const el = document.querySelector(`select[aria-label="${aria}"]`) as HTMLSelectElement | null;
+    if (!el) return null;
+    const needle = code + " —"; // text starts with "CODE — Label"
+    const opt = Array.from(el.options).find((o) => (o.textContent || "").trim().startsWith(needle));
+    return opt?.value || null;
+  }, { aria, code });
+  if (value) await sel.selectOption(value);
+}
+
+async function ensurePropertySelected(page: Page) {
+  const propSel = page.locator('select[name="propertyId"]');
+  if (await propSel.count()) {
+    const firstVal = await propSel.locator('option').nth(0).getAttribute('value');
+    if (firstVal) await propSel.selectOption(firstVal);
+  }
+}
+
 test.describe.serial("E2E scénario complet", () => {
   test("1) Auth admin login/logout", async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
@@ -121,18 +165,21 @@ test.describe.serial("E2E scénario complet", () => {
 
   test("2) Journaux achats & ventes CRUD + exports", async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
+    await ensurePropertyForUser(email, uniq("Bien Journal"));
     await uiLogin(page, email, password);
+
+    // Ensure at least one property exists for the forms
+    const propLabel = uniq("Bien Journal");
+    await createProperty(page, propLabel);
+
     await page.goto("/journal/achats");
     await page.locator('button:has-text("Ajouter")').click();
+    await ensurePropertySelected(page);
     const achatInitial = uniq("E2E Achat Test");
     const achatEdited = uniq("E2E Achat Modifié");
     achatEditedGlobal = achatEdited;
     await page.fill('input[name="designation"]', achatInitial);
-    const achatAccountInput = page.locator(
-      'input[aria-label="Recherche compte comptable"]',
-    );
-    await achatAccountInput.fill("606");
-    await page.locator('button:has-text("606 –")').first().click();
+    await selectLedgerByCode(page, "EXPENSE", "606");
     await page.fill('input[name="amount"]', "123.45");
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${achatInitial}")`)).toBeVisible();
@@ -157,24 +204,14 @@ test.describe.serial("E2E scénario complet", () => {
 
     await page.goto("/journal/ventes");
     await page.locator('button:has-text("Ajouter")').click();
+    await ensurePropertySelected(page);
     const venteLabel = uniq("E2E Vente Test");
-    // Vérifier que le bouton est initialement activé
     const saveButton = page.locator('button:has-text("Enregistrer")');
     await expect(saveButton).toBeEnabled();
-
-    // Remplir les champs requis
     await page.fill('input[name="designation"]', venteLabel);
-    const venteAccInput = page.locator(
-      'input[aria-label="Recherche compte comptable"]',
-    );
-    await venteAccInput.fill("706");
-    await page.locator('button:has-text("706 –")').first().click();
+    await selectLedgerByCode(page, "REVENUE", "706");
     await page.fill('input[name="amount"]', "500");
-
-    // Vérifier que le bouton est activé après remplissage
     await expect(saveButton).toBeEnabled();
-
-    // Cliquer sur le bouton et vérifier la soumission
     await saveButton.click();
     await expect(
       page.locator(`td:has-text("${venteLabel}")`).first(),
@@ -182,26 +219,21 @@ test.describe.serial("E2E scénario complet", () => {
 
     await page.goto("/journal/achats");
     await page.locator('button:has-text("Ajouter")').click();
+    await ensurePropertySelected(page);
     const achatBad = uniq("Achat Interdit");
     await page.fill('input[name="designation"]', achatBad);
-    const achatAccountInput2 = page.locator(
-      'input[aria-label="Recherche compte comptable"]',
-    );
-    await achatAccountInput2.fill("706");
-    await achatAccountInput2.press("Enter");
+    // Try to select a revenue account in purchases
+    await selectLedgerByCode(page, "EXPENSE", "706");
     await page.fill('input[name="amount"]', "10");
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator("text=Compte réservé aux ventes")).toBeVisible();
     await page.click('button:has-text("Annuler")');
 
     await page.locator('button:has-text("Ajouter")').click();
+    await ensurePropertySelected(page);
     const achatLibre = uniq("Achat Libre 601");
     await page.fill('input[name="designation"]', achatLibre);
-    const achatAccountInput3 = page.locator(
-      'input[aria-label="Recherche compte comptable"]',
-    );
-    await achatAccountInput3.fill("601");
-    await achatAccountInput3.press("Enter");
+    await selectLedgerByCode(page, "EXPENSE", "601");
     await page.fill('input[name="amount"]', "55");
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator(`td:has-text("${achatLibre}")`)).toBeVisible();
@@ -209,13 +241,10 @@ test.describe.serial("E2E scénario complet", () => {
 
     await page.goto("/journal/ventes");
     await page.locator('button:has-text("Ajouter")').click();
+    await ensurePropertySelected(page);
     const venteBad = uniq("Vente Interdite 606");
     await page.fill('input[name="designation"]', venteBad);
-    const venteAccInput2 = page.locator(
-      'input[aria-label="Recherche compte comptable"]',
-    );
-    await venteAccInput2.fill("606");
-    await venteAccInput2.press("Enter");
+    await selectLedgerByCode(page, "REVENUE", "606");
     await page.fill('input[name="amount"]', "10");
     await page.click('button:has-text("Enregistrer")');
     await expect(page.locator("text=Compte réservé aux achats")).toBeVisible();

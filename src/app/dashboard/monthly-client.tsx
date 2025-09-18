@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import TWSpinner from "@/components/ui/loader/spinner";
-import { postMonthlyAmortization } from "./actions";
 
 type PropertyOpt = { id: string; label: string };
 
@@ -46,6 +45,8 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
     amortPosted: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [posting, setPosting] = useState(false);
 
   const q = useMemo(() => {
     const p = new URLSearchParams();
@@ -190,34 +191,56 @@ export default function DashboardMonthlyClient({ properties }: { properties: Pro
                   <button
                     type="button"
                     className="btn-primary"
-                    onClick={async () => {
-                      const t = toast("Poste l'amortissement…");
-                      try {
-                        await postMonthlyAmortization({ propertyId, year, month });
-                        toast.success("Amortissement posté");
-                        // refetch
-                        const res = await fetch(
-                          `/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, "0")}&scope=${scope}`,
-                          { cache: "no-store" },
-                        );
-                        const j = await res.json();
-                        setData({
-                          incoming: Number(j.incoming ?? 0),
-                          outgoing: Number(j.outgoing ?? 0),
-                          result: Number(j.result ?? 0),
-                          amortPosted: Boolean(j.amortPosted),
-                        });
-                      } catch {
-                        toast.error("Échec du post");
-                      } finally {
-                        toast.dismiss(t);
-                      }
-                    }}
+                    onClick={() => setConfirmOpen(true)}
                   >
                     Poster l’amortissement
                   </button>
                 )}
               </div>
+              {confirmOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                  <div className="bg-card rounded-md shadow-md w-full max-w-md p-5 space-y-4">
+                    <h3 className="text-lg font-medium">Confirmer</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Poster l’amortissement de {String(month).padStart(2, "0")}/{year} pour le bien sélectionné ?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <button className="btn" type="button" onClick={() => setConfirmOpen(false)} disabled={posting}>Annuler</button>
+                      <button
+                        className="btn-primary"
+                        type="button"
+                        disabled={posting}
+                        onClick={async () => {
+                          setPosting(true);
+                          try {
+                            const res = await fetch('/api/amortizations/post-month', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ propertyId, year, month, scope: 'property' }),
+                            });
+                            if (!res.ok) {
+                              const t = await res.text().catch(()=> 'Erreur');
+                              throw new Error(t || `HTTP ${res.status}`);
+                            }
+                            const j = await res.json();
+                            toast.success(`Amortissement posté (${j.createdCount} créé(s), ${j.skippedCount} déjà présent(s))`);
+                            setConfirmOpen(false);
+                            const ref = await fetch(`/api/dashboard/monthly?property=${encodeURIComponent(propertyId)}&year=${year}&month=${String(month).padStart(2, '0')}&scope=${scope}`, { cache: 'no-store' });
+                            const jj = await ref.json();
+                            setData({ incoming: Number(jj.incoming||0), outgoing: Number(jj.outgoing||0), result: Number(jj.result||0), amortPosted: Boolean(jj.amortPosted) });
+                          } catch {
+                            toast.error('Échec du post');
+                          } finally {
+                            setPosting(false);
+                          }
+                        }}
+                      >
+                        {posting ? '…' : 'Confirmer'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
