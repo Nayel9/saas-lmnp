@@ -5,7 +5,7 @@ import { z } from "zod";
 import { formatDateISO } from "@/lib/format";
 import { isAllowed } from "@/lib/accounting/accountsCatalog";
 import { createEntry, updateEntry } from "./actions";
-import { AccountCodeSelector } from "@/components/AccountCodeSelector";
+import { LedgerAccountSelector } from "@/components/ledger/LedgerAccountSelector";
 import { toast } from "sonner";
 import { Spinner } from "@/components/SubmitButton";
 import { computeFromHT, computeFromTTC } from "@/lib/vat";
@@ -98,6 +98,8 @@ export default function JournalAchatsClient({
   const router = useRouter();
   const [selectedProperty, setSelectedProperty] = useState<string>(properties[0]?.id || "");
   const [vatOn, setVatOn] = useState<boolean>(false);
+  const [selectedLedger, setSelectedLedger] = useState<{ id: string; code: string; label: string } | null>(null);
+  const accountCode = selectedLedger?.code || "";
 
   useEffect(() => {
     let abort = false;
@@ -194,7 +196,7 @@ export default function JournalAchatsClient({
     // Validation catalogue côté client (soft): empêcher compte explicitement ventes
     if (
       isAllowed(parsed.data.account_code, "vente") &&
-      !isAllowed(parsed.data.account_code, "achat")
+      !isAllowed(parsed.data.account_code, "achat") && !fd.get("ledgerAccountId")
     ) {
       setError("Compte réservé aux ventes");
       return;
@@ -222,6 +224,7 @@ export default function JournalAchatsClient({
           setRate("20");
           setTtc("");
           setTva("");
+          setSelectedLedger(null);
         }}
       >
         Ajouter
@@ -260,7 +263,12 @@ export default function JournalAchatsClient({
                 placeholder="Tier (optionnel)"
                 className="input w-full"
               />
-              <AccountCodeSelector typeJournal="achat" />
+              <input type="hidden" name="account_code" value={accountCode} />
+              <LedgerAccountSelector
+                propertyId={selectedProperty}
+                kind="EXPENSE"
+                onSelect={(acc)=>setSelectedLedger(acc)}
+              />
               {!vatOn && (
                 <input name="amount" placeholder="Montant TTC" className="input w-full" />
               )}
@@ -395,6 +403,7 @@ interface EditButtonProps {
     designation: string;
     tier: string | null;
     account_code: string;
+    accountId?: string | null;
     amount: string | number;
     propertyId?: string;
     amountHT?: number;
@@ -411,6 +420,7 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
    const router = useRouter();
    const [selectedProperty, setSelectedProperty] = useState<string>(entry.propertyId || properties[0]?.id || "");
    const [vatOn, setVatOn] = useState<boolean>(false);
+   const [selectedLedger, setSelectedLedger] = useState<{ id: string; code: string; label: string } | null>(null);
 
    useEffect(() => {
      let abort = false;
@@ -526,9 +536,12 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
                  defaultValue={entry.tier || ""}
                  className="input w-full"
                />
-               <AccountCodeSelector
-                 typeJournal="achat"
-                 defaultValue={entry.account_code}
+               <input type="hidden" name="account_code" value={selectedLedger?.code || entry.account_code} />
+               <LedgerAccountSelector
+                 propertyId={selectedProperty}
+                 kind="EXPENSE"
+                 defaultAccountId={entry.accountId || undefined}
+                 onSelect={(acc)=>setSelectedLedger(acc)}
                />
                {!vatOn && (
                  <input name="amount" defaultValue={entry.amount} className="input w-full" />

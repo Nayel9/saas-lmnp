@@ -380,4 +380,74 @@ if (token) {
 - Intégration: endpoints protégés (401 non connecté, 403 propriété étrangère, 200 owner).
 - Middleware: redirection login + 401 API vérifiés.
 
+## Comptabilité > Plan comptable LMNP simplifié
 
+Cette application intègre un plan comptable LMNP simplifié (seed global en base) + la possibilité d’ajouter des comptes personnalisés par bien.
+
+### Comptes seedés (global, non modifiables)
+Produits (REVENUE): 706, 7061 (Loyers / nuitées), 7068
+Charges (EXPENSE): 606, 6063, 6068, 6135, 615, 616, 621, 622, 623, 625, 626, 627, 628
+Taxes (TAX): 635, 63512 (Taxe foncière), 63513 (CFE), 44566, 44571, 44551
+Immobilisations (ASSET): 213, 2135, 2181, 2183, 2184, 2188
+Amortissements (ASSET – comptes d’amortissements correspondants): 2813, 28181, 28183, 28184, 28188
+Trésorerie (TREASURY): 512 (Banque), 53 (Caisse)
+Tiers / Dettes (LIABILITY): 401 (Fournisseurs), 165 (Dépôts & cautionnements reçus)
+Clients (ASSET): 411
+
+### Règles principales
+- Ventes: compte de type REVENUE obligatoire (sauf caution)
+- Caution de vente: doit utiliser le compte 165 (LIABILITY)
+- Achats: compte de type EXPENSE obligatoire
+- Validation côté serveur via `ledgerAccountId` (prioritaire) sinon ancien champ `account_code` (legacy catalogue)
+
+### Comptes personnalisés
+Page: `Paramètres > Comptes`
+1. Choisir le bien (select en haut à droite)
+2. Renseigner Code, Libellé, Type
+3. Ajouter → le compte devient disponible dans les formulaires (sélecteur plan)
+
+Contraintes:
+- Unicité du couple (propertyId, code)
+- `isEditable=false` sur les comptes globaux (seed) → pas de modification ni suppression
+
+### Mapping Catégories → Comptes
+Page: `Paramètres > Raccourcis Catégories`
+- Permet d’associer une clé de catégorie libre (ex: `loyer`, `nettoyage` …) à un compte comptable.
+- Utilisable pour pré‑sélection (évolutions futures).
+- Unicité (propertyId, categoryKey).
+
+### Formulaires Journaux
+Chaque écriture (Achat / Vente) propose un sélecteur de comptes basé sur le plan:
+- Filtrage par type (REVENUE vs EXPENSE)
+- Option “Caution” → force 165
+- Champs dénormalisés `accountCode` / `accountLabel` stockés avec l’écriture
+
+### Backfill des écritures existantes
+Script: `pnpm tsx scripts/backfill-accounts.ts` (dry-run par défaut)
+- Affiche pour chaque écriture sans `accountId` la proposition (heuristique)
+- Appliquer réellement: `pnpm tsx scripts/backfill-accounts.ts --apply`
+Heuristique (si pas de mapping trouvé):
+- Vente caution → 165
+- Vente → 7061
+- Achat ("assur") → 616
+- Achat ("banq"|"stripe") → 627
+- Achat ("entretien"|"reparation") → 615
+- Achat ("fournit"|"equip") → 6063
+- Achat ("taxe foncière") → 63512
+- Sinon → 606
+
+### TVA
+Les comptes de TVA (44566, 44571, 44551) sont seedés (type TAX) pour usage futur (option TVA activée par bien).
+
+### Tests
+- Heuristique backfill: `guessAccountCode.test.ts`
+- Validation multi‑tenant sur endpoints `/api/accounts` & `/api/category-mapping`
+
+### Limitations actuelles
+- Mapping Catégorie→Compte non encore auto-appliqué en création (possible évolution)
+- Ancien champ `account_code` conservé pour compatibilité (catalogue statique) lors de la transition
+- Pas de suppression d’un compte custom s’il est référencé par une écriture
+
+### Bonnes pratiques
+- Créer des comptes custom uniquement si un besoin de granularité réelle (report fiscal) apparaît.
+- Éviter la prolifération de variantes proches (ex: 6063 vs 60631) sans justification.

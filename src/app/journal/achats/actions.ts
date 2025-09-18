@@ -12,6 +12,7 @@ const entrySchema = z.object({
   designation: z.string().min(1),
   tier: z.string().optional().nullable(),
   account_code: z.string().min(1),
+  ledgerAccountId: z.string().regex(/^(c[a-z0-9]{24}|[a-f0-9]{32})$/).optional(),
   amount: z.string().refine((v) => !isNaN(parseFloat(v)), "Montant invalide"),
   currency: z.string().default("EUR"),
   propertyId: z.string().uuid(),
@@ -35,26 +36,33 @@ export async function createEntry(formData: FormData) {
   if (!parsed.success)
     return { ok: false, error: parsed.error.flatten().formErrors.join(", ") } as const;
   const userId = await getUserId();
-  const { date, designation, tier, account_code, amount, currency, propertyId, amountHT, vatRate, amountTTC } = parsed.data;
-  if (isAllowed(account_code, "vente") && !isAllowed(account_code, "achat")) {
-    return { ok: false, error: "Compte réservé aux ventes" } as const;
+  const { date, designation, tier, account_code, ledgerAccountId, amount, currency, propertyId, amountHT, vatRate, amountTTC } = parsed.data;
+  let mutableAccountCode = account_code;
+  let ledgerAcc: { id: string; code: string; label: string; kind: string } | null = null;
+  if (ledgerAccountId) {
+    ledgerAcc = await prisma.ledgerAccount.findFirst({ where: { id: ledgerAccountId, OR: [{ propertyId: null }, { propertyId }] }, select: { id: true, code: true, label: true, kind: true } });
+    if (!ledgerAcc) return { ok: false, error: "Compte introuvable" } as const;
+    if (ledgerAcc.kind !== "EXPENSE") return { ok: false, error: "Compte non charge" } as const;
+    mutableAccountCode = ledgerAcc.code;
+  } else {
+    if (isAllowed(account_code, "vente") && !isAllowed(account_code, "achat")) {
+      return { ok: false, error: "Compte réservé aux ventes" } as const;
+    }
   }
-  const prop = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true, user_id: true } });
-  if (!prop || prop.user_id !== userId) {
-    return { ok: false, error: "Bien invalide" } as const;
-  }
-
   let data: Prisma.JournalEntryUncheckedCreateInput = {
     user_id: userId,
     type: "achat",
     date: new Date(date),
     designation,
     tier: tier || null,
-    account_code,
+    account_code: mutableAccountCode,
     amount: 0,
     currency,
     isDeposit: false,
     propertyId,
+    accountId: ledgerAcc?.id,
+    accountCode: ledgerAcc?.code,
+    accountLabel: ledgerAcc?.label,
   };
 
   const vatRow = await prisma.$queryRawUnsafe<Array<{ vatEnabled: boolean }>>(
@@ -92,39 +100,41 @@ export async function updateEntry(formData: FormData) {
   if (!parsed.success || !parsed.data.id)
     return { ok: false, error: "Validation" };
   const userId = await getUserId();
-  const { id, date, designation, tier, account_code, amount, currency, propertyId, amountHT, vatRate, amountTTC } =
+  const { id: _id, date: uDate, designation: uDesignation, tier: uTier, account_code: uAccount_code, ledgerAccountId: uLedgerAccountId, amount: uAmount, currency: uCurrency, propertyId: uPropertyId, amountHT: uAmountHT, vatRate: uVatRate, amountTTC: uAmountTTC } =
     parsed.data;
-  const existing = await prisma.journalEntry.findUnique({ where: { id } });
-  if (!existing || existing.user_id !== userId)
-    return { ok: false, error: "Introuvable" };
-  if (isAllowed(account_code, "vente") && !isAllowed(account_code, "achat")) {
-    return { ok: false, error: "Compte réservé aux ventes" };
+  let mutableUAccountCode = uAccount_code;
+  let ledgerAccU: { id: string; code: string; label: string; kind: string } | null = null;
+  if (uLedgerAccountId) {
+    ledgerAccU = await prisma.ledgerAccount.findFirst({ where: { id: uLedgerAccountId, OR: [{ propertyId: null }, { propertyId: uPropertyId }] }, select: { id: true, code: true, label: true, kind: true } });
+    if (!ledgerAccU) return { ok: false, error: "Compte introuvable" } as const;
+    if (ledgerAccU.kind !== "EXPENSE") return { ok: false, error: "Compte non charge" } as const;
+    mutableUAccountCode = ledgerAccU.code;
+  } else if (isAllowed(uAccount_code, "vente") && !isAllowed(uAccount_code, "achat")) {
+    return { ok: false, error: "Compte réservé aux ventes" } as const;
   }
-  const prop = await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true, user_id: true } });
-  if (!prop || prop.user_id !== userId) {
-    return { ok: false, error: "Bien invalide" };
-  }
-
   let data: Prisma.JournalEntryUncheckedUpdateInput = {
-    date: new Date(date),
-    designation,
-    tier: tier || null,
-    account_code,
-    currency,
-    propertyId,
+    date: new Date(uDate),
+    designation: uDesignation,
+    tier: uTier || null,
+    account_code: mutableUAccountCode,
+    currency: uCurrency,
+    propertyId: uPropertyId,
+    accountId: ledgerAccU?.id,
+    accountCode: ledgerAccU?.code,
+    accountLabel: ledgerAccU?.label,
   };
 
   const vatRow = await prisma.$queryRawUnsafe<Array<{ vatEnabled: boolean }>>(
     `SELECT "vatEnabled" FROM "Property" WHERE "id" = $1 AND "user_id" = $2`,
-    propertyId,
+    uPropertyId,
     userId,
   );
   const vatOn = !!vatRow[0]?.vatEnabled;
 
   if (vatOn) {
-    const rateNum = vatRate != null && vatRate !== "" ? parseFloat(String(vatRate)) : NaN;
-    const htNum = amountHT != null && amountHT !== "" ? parseFloat(String(amountHT)) : NaN;
-    const ttcNum = amountTTC != null && amountTTC !== "" ? parseFloat(String(amountTTC)) : NaN;
+    const rateNum = uVatRate != null && uVatRate !== "" ? parseFloat(String(uVatRate)) : NaN;
+    const htNum = uAmountHT != null && uAmountHT !== "" ? parseFloat(String(uAmountHT)) : NaN;
+    const ttcNum = uAmountTTC != null && uAmountTTC !== "" ? parseFloat(String(uAmountTTC)) : NaN;
     if (isNaN(rateNum) || rateNum < 0 || rateNum > 100) {
       return { ok: false, error: "Taux TVA invalide" };
     }
@@ -136,10 +146,10 @@ export async function updateEntry(formData: FormData) {
       : { ht: Math.round(htNum * 100) / 100, rate: rateNum, tva: Math.round((htNum * rateNum / 100) * 100) / 100, ttc: Math.round((htNum * (1 + rateNum / 100)) * 100) / 100 };
     data = { ...data, amount: r.ttc, amountHT: r.ht, vatRate: r.rate, vatAmount: r.tva, amountTTC: r.ttc };
   } else {
-    data = { ...data, amount: parseFloat(amount), amountHT: null, vatRate: null, vatAmount: null, amountTTC: null };
+    data = { ...data, amount: parseFloat(uAmount), amountHT: null, vatRate: null, vatAmount: null, amountTTC: null };
   }
 
-  await prisma.journalEntry.update({ where: { id }, data });
+  await prisma.journalEntry.update({ where: { id: _id }, data });
   revalidatePath("/journal/achats");
   return { ok: true };
 }
