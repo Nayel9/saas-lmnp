@@ -33,6 +33,13 @@ const schema = z.object({
   propertyId: z.string().uuid({ message: "Bien requis" }),
 });
 
+// Mapping simple catégorie -> compte par défaut (selon le catalogue actuel)
+const DEFAULT_ASSET_ACCOUNT_BY_CATEGORY: Record<AssetCategory, string> = {
+  mobilier: "2183", // Mobilier
+  batiment: "2135", // Agencements/Aménagements (fallback faute de compte bâtiment dédié)
+  vehicule: "2155", // Matériel (fallback faute de 2182 dans le catalogue)
+};
+
 async function presign(assetId: string, file: File) {
   const res = await fetch("/api/uploads/presign", {
     method: "POST",
@@ -132,6 +139,8 @@ export function AddAssetButton({
   const [category, setCategory] = useState<AssetCategory | "">("");
   const [durationYears, setDurationYears] = useState<string>("");
   const [defaults, setDefaults] = useState<Record<string, number>>({}); // category -> months
+  // seedAccount contrôle la valeur initiale d'AccountCodeSelector (via defaultValue + key)
+  const [seedAccount, setSeedAccount] = useState<string>("");
 
   useEffect(() => {
     if (!selectedProperty) return;
@@ -160,12 +169,18 @@ export function AddAssetButton({
     })();
   }, [selectedProperty, category]);
 
+  // Quand la catégorie change, ajuster durée par défaut et compte par défaut
   useEffect(() => {
     if (!category) return;
     const months = defaults[String(category)];
     if (months && Number.isFinite(months)) {
       const years = Math.max(1, Math.round(months / 12));
       setDurationYears(String(years));
+    }
+    const defCode = DEFAULT_ASSET_ACCOUNT_BY_CATEGORY[category];
+    if (defCode) {
+      setSeedAccount(defCode);
+      setAccountCode(defCode);
     }
   }, [category, defaults]);
 
@@ -304,6 +319,9 @@ export function AddAssetButton({
                 typeJournal="asset"
                 required
                 onChange={setAccountCode}
+                defaultValue={seedAccount}
+                // Re-montage pour appliquer un défaut quand la catégorie change
+                key={seedAccount || "asset-selector"}
               />
 
               <div className="mt-2 border rounded-md p-3">

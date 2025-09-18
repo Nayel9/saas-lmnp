@@ -5,10 +5,10 @@ import { z } from "zod";
 import { formatDateISO } from "@/lib/format";
 import { isAllowed } from "@/lib/accounting/accountsCatalog";
 import { createEntry, updateEntry } from "./actions";
-import { AccountCodeSelector } from "@/components/AccountCodeSelector";
 import { toast } from "sonner";
 import { Spinner } from "@/components/SubmitButton";
 import { computeFromHT, computeFromTTC } from "@/lib/vat";
+import { LedgerAccountSelector } from "@/components/ledger/LedgerAccountSelector";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -99,6 +99,9 @@ export default function JournalVentesClient({
   const router = useRouter();
   const [selectedProperty, setSelectedProperty] = useState<string>(properties[0]?.id || "");
   const [vatOn, setVatOn] = useState<boolean>(false);
+  const [isDepositFlag, setIsDepositFlag] = useState(false);
+  const [selectedLedger, setSelectedLedger] = useState<{ id: string; code: string; label: string } | null>(null);
+  const accountCode = selectedLedger?.code || (isDepositFlag ? "165" : "");
   useEffect(() => {
     let abort = false;
     (async () => {
@@ -192,7 +195,7 @@ export default function JournalVentesClient({
     }
     if (
       isAllowed(String(fd.get("account_code") || ""), "achat") &&
-      !isAllowed(String(fd.get("account_code") || ""), "vente")
+      !isAllowed(String(fd.get("account_code") || ""), "vente") && !fd.get("ledgerAccountId")
     ) {
       setError("Compte réservé aux achats");
       return;
@@ -215,7 +218,7 @@ export default function JournalVentesClient({
         onClick={() => {
           setError(null);
           setOpen(true);
-          setHt(""); setRate("20"); setTtc(""); setTva("");
+          setHt(""); setRate("20"); setTtc(""); setTva(""); setIsDepositFlag(false); setSelectedLedger(null);
         }}
       >
         Ajouter
@@ -254,7 +257,13 @@ export default function JournalVentesClient({
                 placeholder="Client (optionnel)"
                 className="input w-full"
               />
-              <AccountCodeSelector typeJournal="vente" />
+              <input type="hidden" name="account_code" value={accountCode} />
+              <LedgerAccountSelector
+                propertyId={selectedProperty}
+                kind="REVENUE"
+                isDeposit={isDepositFlag}
+                onSelect={(acc) => setSelectedLedger(acc)}
+              />
               {!vatOn && (
                 <input name="amount" placeholder="Montant TTC" className="input w-full" />
               )}
@@ -298,7 +307,7 @@ export default function JournalVentesClient({
               )}
 
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="isDeposit" value="on" />
+                <input type="checkbox" name="isDeposit" value="on" onChange={(e)=>setIsDepositFlag(e.target.checked)} />
                 <span>Caution (à exclure du revenu)</span>
                 <span
                   className="text-xs text-muted-foreground"
@@ -398,23 +407,9 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const [selectedProperty, setSelectedProperty] = useState<string>(entry.propertyId || properties[0]?.id || "");
-  const [vatOn, setVatOn] = useState<boolean>(false);
-  useEffect(() => {
-    let abort = false;
-    (async () => {
-      if (!selectedProperty) return setVatOn(false);
-      try {
-        const res = await fetch(`/api/settings/vat?property=${encodeURIComponent(selectedProperty)}`, { cache: "no-store" });
-        if (!res.ok) { setVatOn(false); return; }
-        const j = await res.json();
-        if (!abort) setVatOn(Boolean(j.vatEnabled));
-      } catch {
-        if (!abort) setVatOn(false);
-      }
-    })();
-    return () => { abort = true; };
-  }, [selectedProperty]);
+  const [vatOn] = useState<boolean>(false);
   const [htE, setHtE] = useState<string>(entry.amountHT != null ? String(entry.amountHT.toFixed ? entry.amountHT.toFixed(2) : entry.amountHT) : "");
+  const [, setSelectedLedger] = useState<{ id: string; code: string; label: string } | null>(null);
   const [rateE, setRateE] = useState<string>(entry.vatRate != null ? String(entry.vatRate) : "20");
   const [ttcE, setTtcE] = useState<string>(entry.amountTTC != null ? String(entry.amountTTC.toFixed ? entry.amountTTC.toFixed(2) : entry.amountTTC) : String(entry.amount));
   const [tvaE, setTvaE] = useState<string>(entry.vatAmount != null ? String(entry.vatAmount.toFixed ? entry.vatAmount.toFixed(2) : entry.vatAmount) : "");
@@ -503,7 +498,13 @@ export function EditButton({ entry, properties }: EditButtonProps & { properties
                 defaultValue={entry.tier || ""}
                 className="input w-full"
               />
-              <AccountCodeSelector typeJournal="vente" defaultValue={entry.account_code} />
+              <input type="hidden" name="account_code" value={entry.account_code} />
+              <LedgerAccountSelector
+                propertyId={selectedProperty}
+                kind="REVENUE"
+                isDeposit={!!entry.isDeposit}
+                onSelect={(acc) => setSelectedLedger(acc)}
+              />
               {!vatOn && (
                 <input name="amount" defaultValue={entry.amount} className="input w-full" />
               )}

@@ -26,6 +26,8 @@ model Property {
   Asset                Asset[]
   // Ajout: relations vers les durées d'amortissement par défaut
   amortizationDefaults AmortizationDefault[]
+  LedgerAccount        LedgerAccount[]       @relation("PropertyLedgerAccounts")
+  CategoryToAccount    CategoryToAccount[]   @relation("PropertyCategoryToAccounts")
 
   @@map("Property")
 }
@@ -80,6 +82,15 @@ enum JournalEntryType {
   vente
 }
 
+enum AccountKind {
+  REVENUE
+  EXPENSE
+  ASSET
+  LIABILITY
+  TREASURY
+  TAX
+}
+
 model JournalEntry {
   id            String           @id @default(uuid())
   user_id       String
@@ -101,6 +112,11 @@ model JournalEntry {
   property      Property?        @relation(fields: [propertyId], references: [id])
   // Nouveau: statut de paiement pour le wizard (PENDING par défaut)
   paymentStatus PaymentStatus    @default(PENDING)
+  accountId     String? // nouvelle FK optionnelle
+  account       LedgerAccount?   @relation(fields: [accountId], references: [id])
+  accountCode   String? // denormalized snapshot
+  accountLabel  String? // denormalized snapshot
+  categoryKey   String? // mapping catégorie -> compte
 
   @@index([user_id])
   @@index([user_id, date, isDeposit])
@@ -241,4 +257,36 @@ model PasswordResetToken {
 
   @@index([userId, token])
   @@map("password_reset_tokens")
+}
+
+model LedgerAccount {
+  id         String              @id @default(cuid())
+  propertyId String?
+  property   Property?           @relation("PropertyLedgerAccounts", fields: [propertyId], references: [id], onDelete: Cascade)
+  code       String
+  label      String
+  kind       AccountKind
+  isEditable Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  entries    JournalEntry[]
+  mappings   CategoryToAccount[]
+
+  @@unique([propertyId, code])
+  @@map("ledger_accounts")
+}
+
+model CategoryToAccount {
+  id          String        @id @default(cuid())
+  propertyId  String
+  property    Property      @relation("PropertyCategoryToAccounts", fields: [propertyId], references: [id], onDelete: Cascade)
+  categoryKey String
+  accountId   String
+  account     LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([propertyId, categoryKey])
+  @@index([accountId])
+  @@map("category_to_account")
 }
