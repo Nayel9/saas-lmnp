@@ -94,6 +94,29 @@ function rowByLabel(page: Page, label: string) {
   return page.locator(`tr:has(td:has-text("${label}"))`);
 }
 
+// Helper: create a property quickly on dashboard
+async function createProperty(page: Page, label: string) {
+  await page.goto("/dashboard");
+  await page.fill('input[name="label"]', label);
+  await page.click('button:has-text("Ajouter")');
+}
+
+// Helper: select ledger account by code in the modal form
+async function selectLedgerByCode(page: Page, url: string, code: string) {
+  const kind = url.includes("ventes") || code.startsWith("7") ? "REVENUE" : "EXPENSE";
+  const aria = kind === "REVENUE" ? "Compte de produits" : "Compte de charges";
+  await page.waitForSelector(`select[aria-label="${aria}"]`);
+  await page.evaluate(({ aria, code }) => {
+    const sel = document.querySelector(`select[aria-label="${aria}"]`) as HTMLSelectElement | null;
+    if (!sel) return;
+    const idx = Array.from(sel.options).findIndex((o) => (o.textContent || "").includes(code));
+    if (idx > 0) {
+      sel.selectedIndex = idx;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }, { aria, code });
+}
+
 async function createEntryWithLabel(
   page: Page,
   url: string,
@@ -104,11 +127,7 @@ async function createEntryWithLabel(
   await page.goto(url);
   await page.locator('button:has-text("Ajouter")').click();
   await page.fill('input[name="designation"]', label);
-  const accInput = page.locator(
-    'input[aria-label="Recherche compte comptable"]',
-  );
-  await accInput.fill(account);
-  await accInput.press("Enter");
+  await selectLedgerByCode(page, url, account);
   await page.fill('input[name="amount"]', amount);
   await page.click('button:has-text("Enregistrer")');
   await expect(page.locator(`td:has-text("${label}")`).first()).toBeVisible();
@@ -118,6 +137,8 @@ test.describe.serial("Pièces jointes – E2E", () => {
   test("1) Vente: upload PDF et téléchargement", async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
+    // Ensure a property exists
+    await createProperty(page, `Bien PJ ${Date.now()}`);
     const label = `Vente PJ ${Date.now()}`;
     await createEntryWithLabel(page, "/journal/ventes", label, "706", "42");
 
@@ -130,8 +151,6 @@ test.describe.serial("Pièces jointes – E2E", () => {
     await page.locator('button:has-text("Fermer")').click();
     await expect(row.locator('button:has-text("📎 1")')).toBeVisible();
 
-    // Réouvrir et télécharger
-    await clipBtn.click();
     const download = await Promise.all([
       page.waitForEvent("download"),
       page.click('a:has-text("Télécharger")'),
@@ -143,6 +162,7 @@ test.describe.serial("Pièces jointes – E2E", () => {
   test("2) Achat: upload JPG, lister et télécharger", async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
+    await createProperty(page, `Bien PJ2 ${Date.now()}`);
     const label = `Achat PJ ${Date.now()}`;
     await createEntryWithLabel(page, "/journal/achats", label, "606", "12");
 
@@ -161,6 +181,7 @@ test.describe.serial("Pièces jointes – E2E", () => {
   test("3) Erreur type interdit .txt", async ({ page }) => {
     const { email, password } = await ensureAdminCreds();
     await uiLogin(page, email, password);
+    await createProperty(page, `Bien PJ3 ${Date.now()}`);
     const label = `Achat Bad ${Date.now()}`;
     await createEntryWithLabel(page, "/journal/achats", label, "606", "5");
 
@@ -180,6 +201,7 @@ test.describe.serial("Pièces jointes – E2E", () => {
     const contextA = await browser.newContext();
     const pageA = await contextA.newPage();
     await uiLogin(pageA, email, password);
+    await createProperty(pageA, `Bien PJ4 ${Date.now()}`);
     const label = `Vente Protect ${Date.now()}`;
     await createEntryWithLabel(pageA, "/journal/ventes", label, "706", "15");
     const row = rowByLabel(pageA, label);

@@ -10,6 +10,7 @@ import {
   AttachmentsPreviewTrigger,
 } from "@/components/attachments/AttachmentsPanel";
 import { SubmitButton } from "@/components/SubmitButton";
+import PostAssetAmortButton from "./PostAssetAmortButton";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,10 @@ export default async function AssetsPage({
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Comptage des pièces jointes par immobilisation visible
+  // Compute per-asset posted flag for current month
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const monthKey = `${year}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const assetIds = rows.map((a) => a.id);
   const countsRaw = assetIds.length
     ? await prisma.attachment.groupBy({
@@ -68,6 +72,21 @@ export default async function AssetsPage({
   const countMap = new Map<string | null, number>(
     countsRaw.map((c) => [c.assetId, c._count._all]),
   );
+  const amortRows = assetIds.length
+    ? await prisma.amortization.findMany({
+        where: {
+          user_id: user.id,
+          year,
+          note: { contains: `month:${monthKey}` },
+        },
+        select: { note: true },
+      })
+    : [];
+  const postedSet = new Set<string>();
+  for (const r of amortRows) {
+    const m = /asset:([a-z0-9-]+)/i.exec(r.note || "");
+    if (m?.[1]) postedSet.add(m[1]);
+  }
 
   async function deleteAction(formData: FormData) {
     "use server";
@@ -134,7 +153,14 @@ export default async function AssetsPage({
                     <AttachmentsPreviewTrigger assetId={a.id} />
                   </div>
                 </td>
-                <td className="py-1 pr-2 text-right">
+                <td className="py-1 pr-2 text-right flex items-center gap-2">
+                  {a.propertyId ? (
+                    <PostAssetAmortButton
+                      propertyId={a.propertyId}
+                      assetId={a.id}
+                      posted={postedSet.has(a.id)}
+                    />
+                  ) : null}
                   <EditAssetButton
                     asset={{
                       id: a.id,

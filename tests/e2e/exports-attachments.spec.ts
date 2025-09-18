@@ -92,7 +92,19 @@ async function createProperty(page: Page, label: string) {
   await page.goto("/dashboard");
   await page.fill('input[name="label"]', label);
   await page.click('button:has-text("Ajouter")');
-  // Le dashboard ne liste pas les biens actuellement; pas d’assertion d’affichage ici.
+}
+
+// Helper: select ledger account by code depending on page
+async function selectLedgerByCode(page: Page, url: string, code: string) {
+  const kind = url.includes("ventes") || code.startsWith("7") ? "REVENUE" : "EXPENSE";
+  const aria = kind === "REVENUE" ? "Compte de produits" : "Compte de charges";
+  await page.waitForSelector(`select[aria-label="${aria}"]`);
+  await page.evaluate(({ aria, code }) => {
+    const sel = document.querySelector(`select[aria-label="${aria}"]`) as HTMLSelectElement | null;
+    if (!sel) return;
+    const idx = Array.from(sel.options).findIndex((o) => (o.textContent || "").includes(code));
+    if (idx > 0) { sel.selectedIndex = idx; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+  }, { aria, code });
 }
 
 async function createEntryWithLabel(
@@ -105,11 +117,7 @@ async function createEntryWithLabel(
   await page.goto(url);
   await page.locator('button:has-text("Ajouter")').click();
   await page.fill('input[name="designation"]', label);
-  const accInput = page.locator(
-    'input[aria-label="Recherche compte comptable"]',
-  );
-  await accInput.fill(account);
-  await accInput.press("Enter");
+  await selectLedgerByCode(page, url, account);
   await page.fill('input[name="amount"]', amount);
   await page.click('button:has-text("Enregistrer")');
   await expect(page.locator(`td:has-text("${label}")`).first()).toBeVisible();
