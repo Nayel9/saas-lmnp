@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import React from "react";
 
 vi.mock("next/navigation", () => ({
@@ -15,6 +15,29 @@ const authMock = {
 };
 
 vi.mock("next-auth/react", () => authMock);
+
+// Mock Sheet pour éviter les portals/animations en test
+vi.mock("@/components/ui/sheet", () => {
+  const Pass: React.FC<React.PropsWithChildren<unknown>> = ({ children }) => (
+    <>{children}</>
+  );
+  const Box: React.FC<React.PropsWithChildren<unknown>> = ({ children }) => (
+    <div>{children}</div>
+  );
+  return {
+    __esModule: true,
+    Sheet: Box,
+    SheetContent: Box,
+    SheetTrigger: Pass,
+    SheetClose: Pass,
+    SheetTitle: Pass,
+    SheetDescription: Pass,
+  };
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("MobileNav", () => {
   it("ouvre le drawer et marque Ventes actif", async () => {

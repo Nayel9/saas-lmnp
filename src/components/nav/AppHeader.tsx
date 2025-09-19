@@ -3,6 +3,12 @@ import React, { useEffect, useState } from "react";
 import DesktopNav from "./DesktopNav";
 import MobileNav from "./MobileNav";
 
+// Compatibilité Safari: MediaQueryList historique avec addListener/removeListener
+type MQLegacy = MediaQueryList & {
+  addListener?: (listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => void;
+  removeListener?: (listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => void;
+};
+
 export function AppHeader() {
   const getInitial = () => {
     if (typeof window === "undefined") return null;
@@ -14,15 +20,21 @@ export function AppHeader() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const m = window.matchMedia("(min-width: 768px)");
-    const update = (ev?: MediaQueryListEvent) => setIsDesktop(ev ? ev.matches : m.matches);
-    // initial
+
+    const onChange: (ev: MediaQueryListEvent) => void = (ev) => {
+      setIsDesktop(ev.matches);
+    };
+
+    // Initial
     setIsDesktop(m.matches || window.innerWidth >= 768);
-    // listener
-    if (m.addEventListener) m.addEventListener("change", update);
-    else m.addListener(update);
+
+    // Écouteurs suivant l'API disponible
+    if (typeof m.addEventListener === "function") m.addEventListener("change", onChange);
+    else if ((m as MQLegacy).addListener) (m as MQLegacy).addListener!(onChange);
+
     return () => {
-      if (m.removeEventListener) m.removeEventListener("change", update as any);
-      else m.removeListener(update as any);
+      if (typeof m.removeEventListener === "function") m.removeEventListener("change", onChange);
+      else if ((m as MQLegacy).removeListener) (m as MQLegacy).removeListener!(onChange);
     };
   }, []);
 

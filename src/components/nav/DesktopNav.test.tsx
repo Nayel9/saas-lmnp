@@ -20,7 +20,7 @@ describe("DesktopNav", () => {
       }),
       signOut: vi.fn(),
     }));
-    const { DesktopNav } = await import("./DesktopNav");
+    const DesktopNav = (await import("./DesktopNav")).default;
     render(<DesktopNav />);
     const nav = screen.getByRole("navigation", { name: /navigation principale/i });
     expect(nav).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe("DesktopNav", () => {
       }),
       signOut: vi.fn(),
     }));
-    const { DesktopNav } = await import("./DesktopNav");
+    const DesktopNav = (await import("./DesktopNav")).default;
     render(<DesktopNav />);
     const ventes = screen.getByRole("link", { name: /ventes/i });
     expect(ventes).toHaveAttribute("aria-current", "page");
@@ -45,9 +45,12 @@ describe("DesktopNav", () => {
       useSession: () => ({ data: { user: { id: "u1", email: "u@test", plan: "free" } }, status: "authenticated" }),
       signOut: vi.fn(),
     }));
-    const { DesktopNav } = await import("./DesktopNav");
+    const DesktopNav = (await import("./DesktopNav")).default;
     render(<DesktopNav />);
-    const imm = screen.getByText(/immobilisations/i);
-    expect(imm).toHaveAttribute("aria-disabled");
+    // Le lien Immobilisations ne doit pas exister
+    expect(screen.queryByRole("link", { name: /immobilisations/i })).toBeNull();
+    // Un élément aria-disabled doit être présent pour Immobilisations
+    const disabledImm = screen.getByText(/immobilisations/i, { selector: 'span[aria-disabled="true"]' });
+    expect(disabledImm).toBeInTheDocument();
   });
 });

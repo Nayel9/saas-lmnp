@@ -39,8 +39,7 @@ function DesktopNav() {
   const plan = (user?.plan as string | null | undefined) ?? null;
 
   useEffect(() => {
-    // Debug log to help reproduire les cas où le nav ne s'affiche pas
-    // eslint-disable-next-line no-console
+    // Debug log pour reproduire certains cas; conservé mais sans directive eslint inutile
     console.debug("[DesktopNav] render", {
       pathname,
       isAuth,
@@ -128,8 +127,6 @@ function DesktopNav() {
                                 : "hover:bg-bg-muted",
                               "list-none cursor-pointer",
                             )}
-                            aria-haspopup="menu"
-                            aria-expanded={undefined}
                           >
                             {item.label}
                           </summary>
@@ -197,11 +194,9 @@ function DesktopNav() {
             {isAuth ? (
               <details
                 className="relative"
-                aria-haspopup="menu"
               >
                 <summary
                   className="flex relative items-center gap-2 outline-none focus-visible:ring-2 ring-[--color-ring] rounded-md cursor-pointer"
-                  aria-expanded={undefined}
                 >
                   <div
                     data-testid="account-menu-button"
