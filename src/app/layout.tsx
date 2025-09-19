@@ -1,12 +1,10 @@
-// app/layout.tsx
-import "./globals.css"; // <= c'est ça qui charge ton CSS
-// import "./tailwind.css";
+import "./globals.css";
 
 import Providers from "./providers";
-import { NavBar } from "@/components/NavBar";
 import React from "react";
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import AppHeader from "@/components/nav/AppHeader";
 
 export const metadata: Metadata = {
   title: "LMNP App – Comptabilité LMNP simple (amortissements, 2033C/E/A)",
@@ -23,7 +21,7 @@ export default function RootLayout({
   const titleValue = typeof metadata.title === "string" ? metadata.title : "";
 
   return (
-    <html lang="fr" className="scroll-smooth">
+    <html lang="fr" className="scroll-smooth" data-scroll-behavior="smooth">
       <head>
         <meta name="description" content={metadata.description ?? undefined} />
         <title>{titleValue}</title>
@@ -36,8 +34,8 @@ export default function RootLayout({
           Aller au contenu
         </a>
         <Providers>
-          <NavBar />
-          <div className="flex-1">{children}</div>
+          <AppHeader />
+          <div id="main" className="flex-1">{children}</div>
           <Toaster />
         </Providers>
       </body>
