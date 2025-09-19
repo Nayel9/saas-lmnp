@@ -451,3 +451,33 @@ Les comptes de TVA (44566, 44571, 44551) sont seedés (type TAX) pour usage futu
 ### Bonnes pratiques
 - Créer des comptes custom uniquement si un besoin de granularité réelle (report fiscal) apparaît.
 - Éviter la prolifération de variantes proches (ex: 6063 vs 60631) sans justification.
+
+## UI/UX > Navbar
+
+Architecture
+- AppHeader orchestre deux rendus dédiés: MobileNav (md<) et DesktopNav (md+), pour une UX optimisée.
+- Une configuration commune typée alimente les deux: src/config/nav.config.ts (NavItem[] sans any/unknown).
+- Détection d’actif via usePathname(): match "exact" ou "startsWith" selon l’item.
+
+Logo
+- SVG propre avec tailles fixes 120×28 (pas de CLS). Fichiers: public/logo.svg et public/logo-dark.svg.
+- Bascule thème clair/sombre via classes Tailwind (dark:hidden / dark:block) ou currentColor.
+- Safe area: padding horizontal dans MobileNav pour éviter les clips en bord.
+
+Accessibilité
+- Skip link “Aller au contenu” présent dans app/layout.tsx (visible au focus).
+- Rôles/aria corrects: nav[aria-label="Navigation principale"], aria-current="page" pour l’actif.
+- Drawer mobile basé sur Radix Dialog (Sheet): focus trap, fermeture ESC et clic en dehors.
+
+Ajout/modification de liens
+- Éditer src/config/nav.config.ts et compléter le tableau export const navItems: NavItem[].
+- Champs utiles: section ("main"|"secondary"), requires.plan ("free"|"pro"), requires.auth, match ("exact"|"startsWith").
+- Les composants MobileNav/DesktopNav consomment automatiquement cette config et appliquent cache/désactivation selon la session (plan/auth).
+
+Tests
+- Unitaires (Vitest + RTL): DesktopNav/MobileNav, actif selon pathname, accessibilité de base, skip link.
+- Intégration: AppHeader rendu en shell, liens conditionnels mock session/auth.
+- E2E (facultatif): ouverture/fermeture du Drawer mobile, navigation des liens.
+
+Changelog
+- [2025-09-18] Refonte navbar responsive (Desktop + Mobile), config unifiée, logo SVG dark/light, a11y et tests.

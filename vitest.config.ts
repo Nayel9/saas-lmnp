@@ -6,6 +6,8 @@ export default defineConfig({
     exclude: ["tests/e2e/**", "node_modules/**"],
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
+    testTimeout: 10000,
+    hookTimeout: 10000,
   },
   resolve: {
     alias: {

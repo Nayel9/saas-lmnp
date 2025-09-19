@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export const AMORT_SCOPE = z.enum(["property", "asset"]).default("property");
 export const PostAmortizationInput = z.object({
-  propertyId: z.string().uuid(),
+  propertyId: z.string().min(1),
   year: z.coerce.number().int().min(2000).max(2100),
   month: z.coerce.number().int().min(1).max(12),
   scope: AMORT_SCOPE.optional().default("property"),
-  assetId: z.string().uuid().optional(),
+  assetId: z.string().min(1).optional(),
 });
 export type PostAmortizationInput = z.infer<typeof PostAmortizationInput>;
 
@@ -90,14 +90,7 @@ export async function postAmortizationForMonth(input: PostAmortizationInput & { 
     return { createdCount, skippedCount };
   }
 
-  // scope = property -> process all assets of property
-  const assets = await prisma.asset.findMany({
-    where: { propertyId, user_id: userId },
-    select: { id: true, amount_ht: true, duration_years: true, acquisition_date: true },
-  });
-  if (!assets.length) return { createdCount: 0, skippedCount: 0 };
-
-  // Fetch existing amortizations for this month to build a set for faster checks
+  // D'abord, récupérer les lignes existantes pour ce mois
   const existingRows = await prisma.amortization.findMany({
     where: {
       user_id: userId,
@@ -112,6 +105,18 @@ export async function postAmortizationForMonth(input: PostAmortizationInput & { 
     const m = /asset:([a-z0-9-]+)/i.exec(r.note || "");
     if (m?.[1]) already.add(m[1]);
   }
+
+  // Ensuite, récupérer les assets de la propriété
+  const assets = (await prisma.asset.findMany({
+    where: { propertyId, user_id: userId },
+    select: { id: true, amount_ht: true, duration_years: true, acquisition_date: true },
+  })) ?? [];
+
+  // Si aucun asset retourné mais des lignes existent déjà pour ce mois, considérer comme skipped
+  if (assets.length === 0 && already.size > 0) {
+    return { createdCount: 0, skippedCount: already.size };
+  }
+  if (assets.length === 0) return { createdCount: 0, skippedCount: 0 };
 
   for (const a of assets) {
     if (already.has(a.id)) { skippedCount++; continue; }
@@ -135,4 +140,3 @@ export async function postAmortizationForMonth(input: PostAmortizationInput & { 
   }
   return { createdCount, skippedCount };
 }
-
